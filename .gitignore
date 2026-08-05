@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output (built from src)
+dist/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+npm-debug.log
+yarn.lock
+
+# Dev tooling / project working files
+.superpowers/
+.impeccable/
+docs/
