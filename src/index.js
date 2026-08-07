@@ -5,6 +5,7 @@ import { lineAction, linePainter } from './line'
 import { cloudAction, cloudPainter } from './cloud'
 import { hookAction, hookPainter } from './hook'
 import { tutorialAction, tutorialPainter } from './tutorial'
+import { addBalloon } from './balloon'
 import * as constant from './constant'
 import { startAnimate, endAnimate } from './animateFuncs'
 
@@ -25,10 +26,13 @@ window.TowerGame = (option = {}) => {
   const pathGenerator = (path) => `./assets/${path}`
 
   game.addImg('background', pathGenerator('background.webp'))
+  game.addImg('gamebg', pathGenerator('game-bg-1.webp'))
+  game.addImg('gamebg2', pathGenerator('game-bg-2.webp'))
   game.addImg('hook', pathGenerator('hook.png'))
   game.addImg('blockRope', pathGenerator('block-rope.png'))
   game.addImg('block', pathGenerator('block.png'))
   game.addImg('block-perfect', pathGenerator('block-perfect.png'))
+  game.addImg('balloon', pathGenerator('balloon.png'))
   for (let i = 1; i <= 8; i += 1) {
     game.addImg(`c${i}`, pathGenerator(`c${i}.png`))
   }
@@ -41,23 +45,31 @@ window.TowerGame = (option = {}) => {
   game.addImg('tutorial-arrow', pathGenerator('tutorial-arrow.png'))
   game.addImg('heart', pathGenerator('heart.png'))
   game.addImg('score', pathGenerator('score.png'))
+  // Mango cream sprinkle variants: blob, teardrop, capsule sprinkle, dot.
+  for (let i = 1; i <= 4; i += 1) {
+    game.addImg(`cream${i}`, pathGenerator(`cream-${i}.png`))
+  }
   game.addAudio('drop-perfect', pathGenerator('drop-perfect.mp3'))
   game.addAudio('drop', pathGenerator('drop.mp3'))
   game.addAudio('game-over', pathGenerator('game-over.mp3'))
   game.addAudio('rotate', pathGenerator('rotate.mp3'))
   game.addAudio('bgm', pathGenerator('bgm.mp3'))
-  game.setVariable(constant.blockWidth, game.width * 0.25)
-  game.setVariable(constant.blockHeight, game.getVariable(constant.blockWidth) * 0.71)
+  game.setVariable(constant.blockWidth, game.width * 0.39)
+  // Height as a fraction of width. Lower = flatter, more normal-looking cake
+  // layer; the tall 0.71 slab read as too chunky next to its own width.
+  game.setVariable(constant.blockHeight, game.getVariable(constant.blockWidth) * 0.56)
   game.setVariable(constant.currentWidth, game.getVariable(constant.blockWidth))
+  game.setVariable(constant.currentHeight, game.getVariable(constant.blockHeight))
   game.setVariable(constant.cloudSize, game.width * 0.3)
-  game.setVariable(constant.ropeHeight, game.height * 0.4)
+  game.setVariable(constant.ropeHeight, game.height * 0.34)
+  game.setVariable(constant.lineInitialOffset, game.height * 0.653)
   game.setVariable(constant.blockCount, 0)
   game.setVariable(constant.successCount, 0)
   game.setVariable(constant.failedCount, 0)
   game.setVariable(constant.gameScore, 0)
   game.setVariable(constant.hardMode, false)
   game.setVariable(constant.gameUserOption, option)
-  for (let i = 1; i <= 4; i += 1) {
+  for (let i = 1; i <= 2; i += 1) {
     const cloud = new Instance({
       name: `cloud_${i}`,
       action: cloudAction,
@@ -79,6 +91,8 @@ window.TowerGame = (option = {}) => {
     painter: hookPainter
   })
   game.addInstance(hook)
+  // The mango hot-air balloon wanders in and watches the tower being built.
+  addBalloon(game)
 
   game.startAnimate = startAnimate
   game.endAnimate = endAnimate

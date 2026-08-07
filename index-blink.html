@@ -57,21 +57,11 @@
 
   .content { height: 100vh; margin: 0 auto; position: relative; }
 
-  .landing .title { width: 40%; }
+  .landing .title { width: 76%; display: block; margin: 0 auto; }
+  .landing .action-1 { position: relative; top: -0.9rem; }
   .landing .logo { width: 30%; position: absolute; right: .2rem; top: .2rem; }
-  .landing .action-2 { position: absolute; bottom: .1rem; width: 100%; }
-  .landing .start { width: 50%; cursor: pointer; }
-  .blink-hint {
-    margin-top: .12rem;
-    color: #fff;
-    font-size: .16rem;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-shadow: 0 2px 6px rgba(0,0,0,.45);
-  }
-  .blink-hint.small { font-size: .13rem; font-weight: 400; opacity: .8; }
-  .blink-hint.ok { color: #7dffb0; }
-  .blink-hint.err { color: #ffd166; }
+  .landing .action-2 { position: absolute; bottom: .15rem; width: 100%; }
+  .landing .start { width: 43%; cursor: pointer; filter: drop-shadow(0 .05rem .08rem rgba(0,0,0,.5)); }
 
   .slideTop { -webkit-animation: st 1s ease-in-out; animation: st 1s ease-in-out; }
   @-webkit-keyframes st { 0% { transform: translateZ(0); } 100% { transform: translate3d(0,-100%,0); } }
@@ -172,7 +162,6 @@
       <div class="action-1"><img src="./assets/main-index-title.webp" class="title swing"></div>
       <div class="action-2">
         <img id="start" src="./assets/main-index-start.webp" class="start">
-        <div class="blink-hint" id="landingHint">👁 BLINK to start · or click</div>
       </div>
     </div>
 
@@ -246,7 +235,6 @@
   const loadBar     = document.querySelector('.loading .percent');
   const loadDetail  = document.getElementById('loadDetail');
   const loadWarn    = document.getElementById('loadWarn');
-  const landingHint = document.getElementById('landingHint');
   const blinkDot    = document.getElementById('blinkDot');
 
   // Audio unlock state — see unlockAudio() below.
@@ -390,21 +378,7 @@
       loadingEl.classList.add('hide');
       landingEl.classList.remove('hide');
       landingShownAt = performance.now();
-      updateLandingHint();
     }, 1000);
-  }
-
-  function updateLandingHint() {
-    if (blinkReady) {
-      landingHint.textContent = '👁 BLINK to start · or click';
-      landingHint.className = 'blink-hint ok';
-    } else if (cameraDenied || !modelDone) {
-      landingHint.textContent = 'Click to start';
-      landingHint.className = 'blink-hint err';
-    } else {
-      landingHint.textContent = '👁 Click to start — blink turns on in a moment';
-      landingHint.className = 'blink-hint';
-    }
   }
 
   /* ============================================================
@@ -480,7 +454,6 @@
       console.info('[Blink] Worker model ready (' + msg.delegate + ')');
       updateBlinkReadiness();
       renderProgress();
-      updateLandingHint();
       checkAllReady();
       return;
     }
@@ -541,14 +514,12 @@
           .then(() => {
             updateBlinkReadiness();
             renderProgress();
-            updateLandingHint();
           })
           .catch((e2) => {
             cameraDenied = true;
             console.warn('[Blink] Camera unavailable:', e2);
             updateBlinkReadiness();
             renderProgress();
-            updateLandingHint();
           });
       };
       document.addEventListener('click', retryCam);
@@ -557,7 +528,6 @@
     }
     updateBlinkReadiness();
     renderProgress();
-    updateLandingHint();
   }
 
   /* ============================================================
@@ -792,7 +762,6 @@
 
     // 3) If everything finished before we got here, refresh the landing hint.
     updateBlinkReadiness();
-    updateLandingHint();
   }
 
   init();
