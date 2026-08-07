@@ -3,10 +3,27 @@ import * as constant from './constant'
 export const checkMoveDown = engine =>
   (engine.checkTimeMovement(constant.moveDownMovement))
 
+// A block keeps its cake proportions: as clipping shaves the width down, the
+// layer gets shorter too instead of stretching into a long thin slab. Applies
+// to the hanging rope block as well, since it is built from the same width.
+export const getBlockHeightForWidth = (engine, width) => {
+  const fullWidth = engine.getVariable(constant.blockWidth)
+  const fullHeight = engine.getVariable(constant.blockHeight)
+  if (!fullWidth) return fullHeight
+  const ratio = Math.max(constant.minHeightRatio, Math.min(1, width / fullWidth))
+  return fullHeight * ratio
+}
+
 export const getMoveDownValue = (engine, store) => {
   const pixelsPerFrame = store ? store.pixelsPerFrame : engine.pixelsPerFrame.bind(engine)
   const successCount = engine.getVariable(constant.successCount)
-  const calHeight = engine.getVariable(constant.blockHeight) * 2
+  // Track the height the tower actually grew by (the layer that just landed),
+  // so squeezed layers scroll proportionally less and the stack stays pinned.
+  const landedHeight = engine.getVariable(
+    constant.currentHeight,
+    engine.getVariable(constant.blockHeight)
+  )
+  const calHeight = landedHeight * 2
   if (successCount <= 4) {
     return pixelsPerFrame(calHeight * 1.25)
   }

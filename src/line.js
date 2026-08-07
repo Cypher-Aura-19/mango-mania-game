@@ -8,16 +8,27 @@ export const lineAction = (instance, engine, time) => {
     i.ready = true
     i.collisionX = engine.width - engine.getVariable(constant.blockWidth)
   }
-  engine.getTimeMovement(
-    constant.moveDownMovement,
-    [[instance.y, instance.y + (getMoveDownValue(engine, { pixelsPerFrame: s => s / 2 }))]],
-    (value) => {
-      instance.y = value
-    },
-    {
-      name: 'line'
-    }
-  )
+  // Tower stays still — the line never scrolls. Only the background scrolls
+  // (see background.js) to give the sense of ascending.
+  // From the 2nd landing the line scrolls down by one block height per land —
+// exactly cancelling the rise from stacking — so the tower top stays pinned.
+// The background scrolls at the same rate, so the whole world moves as one
+// and the tower never appears to climb or drop.
+  if (engine.getVariable(constant.successCount, 0) >= 2) {
+    engine.getTimeMovement(
+      constant.moveDownMovement,
+      [[instance.y, instance.y + (getMoveDownValue(engine, { pixelsPerFrame: s => s / 2 }))]],
+      (value) => {
+        instance.y = value
+      },
+      {
+        name: 'line'
+      }
+    )
+  }
+  // Keep the sway: the line rocks horizontally in sync with the landed blocks
+  // at the SAME velocity, so the whole tower stays aligned (no gaps between
+  // clipped seams).
   const landBlockVelocity = getLandBlockVelocity(engine, time)
   instance.x += landBlockVelocity
   instance.collisionX += landBlockVelocity
