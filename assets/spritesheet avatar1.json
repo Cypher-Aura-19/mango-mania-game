@@ -1,0 +1,28 @@
+{
+  "frames": {
+    "avatar1": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 1254,
+        "h": 1254
+      },
+      "rotated": false,
+      "trimmed": false,
+      "sourceSize": {
+        "w": 1254,
+        "h": 1254
+      }
+    }
+  },
+  "meta": {
+    "app": "https://codeshack.io/images-sprite-sheet-generator/",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1254,
+      "h": 1254
+    },
+    "scale": "1"
+  }
+}
