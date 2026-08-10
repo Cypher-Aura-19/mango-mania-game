@@ -1,12 +1,18 @@
-import { getMoveDownValue, getLandBlockVelocity } from './utils'
+import { getMoveDownValue, getLandBlockVelocity, isGameOver, pl, pw } from './utils'
 import * as constant from './constant'
 
 export const lineAction = (instance, engine, time) => {
   const i = instance
+  // Frozen scene: the landing target stops scrolling with the tower.
+  if (isGameOver(engine)) return
   if (!i.ready) {
     i.y = engine.getVariable(constant.lineInitialOffset)
     i.ready = true
-    i.collisionX = engine.width - engine.getVariable(constant.blockWidth)
+    // The first floor may land anywhere across the stacking column, so the
+    // starting target spans it end to end. Both ends are column-relative: on a
+    // laptop the canvas is wider, but the tower is still built in the middle.
+    i.x = pl(engine)
+    i.collisionX = pl(engine) + pw(engine) - engine.getVariable(constant.blockWidth)
   }
   // Tower stays still — the line never scrolls. Only the background scrolls
   // (see background.js) to give the sense of ascending.

@@ -7,7 +7,14 @@ import {
   touchEventHandler,
   addSuccessCount,
   addFailedCount,
-  addScore
+  addScore,
+  addSatisfaction,
+  getSatisfactionDelta,
+  isGameOver,
+  playSfx,
+  pl,
+  pw,
+  px
 } from './utils'
 import * as constant from './constant'
 
@@ -15,12 +22,12 @@ let fragmentSeq = 0
 let creamSeq = 0
 
 // Dead padding baked into the block textures, as a fraction of texture height.
-// Measured with measure-alpha.js: block.png is 1705 rows tall but only rows
+// Measured with measure-alpha.js: block.webp is 1705 rows tall but only rows
 // 66..1669 are FULLY opaque. Rows 57-65 fade in and rows 1670-1687 fade out —
 // trimming only the completely-transparent rows still left those soft ramps
 // being drawn, and two semi-transparent edges stacked on each other let the
 // background show through as a hairline seam. Cut to the solid body so every
-// floor has a hard top and bottom edge. block-perfect.png has no padding.
+// floor has a hard top and bottom edge. block-perfect.webp has no padding.
 const TEX_PAD = {
   block: { top: 66 / 1705, bottom: 35 / 1705 },
   'block-perfect': { top: 0, bottom: 0 }
@@ -34,7 +41,7 @@ const texSrcY = (imgName, img) => {
   return { sy, sh }
 }
 
-// block-rope.png is a sling hanging ABOVE a cake, not a bare cake. These are the
+// block-rope.webp is a sling hanging ABOVE a cake, not a bare cake. These are the
 // cake body's bounds as fractions of the texture, measured from its alpha
 // channel: the cake starts halfway down the image. Stretching the whole texture
 // into the block's width/height box therefore drew the cake at ~0.61x the
@@ -59,6 +66,34 @@ const swingCakeBox = instance => ({
 // so releasing it grows it back symmetrically — an edge anchor would make the
 // block visibly jump sideways or downward on the first frame of the drop.
 const SWING_SCALE = 0.88
+
+/* Where the sling's gold ring is on screen — the point the hook's claw has to
+ * close on.
+ *
+ * block-rope.webp carries the ring at the top of the sling: rows 56..195 of 2455
+ * (centre 125.5) and cols 1061..1204 (centre 1132.5, a shade RIGHT of the
+ * texture's own centre). Run those through the same solve drawSwingBlock uses
+ * and they land wherever the block currently hangs.
+ *
+ * It has to be computed rather than written down as a constant offset because
+ * it is a multiple of the BLOCK's height, while the rope is a multiple of
+ * ropeHeight — and those two scale off different things. ropeHeight comes off
+ * the canvas height, the block off the play column, so their ratio moves with
+ * the window's aspect; and clipping squeezes the block further as the tower
+ * goes up. A fixed rope length can only meet the ring at one window size on one
+ * turn of the game.
+ */
+const RING = { cx: 1132.5 / 2209, cy: 125.5 / 2455 }
+
+export const slingRingPos = (instance) => {
+  const cake = scaledSwingCakeBox(instance)
+  const fullW = cake.w / (ROPE_CAKE.right - ROPE_CAKE.left)
+  const fullH = cake.h / (ROPE_CAKE.bottom - ROPE_CAKE.top)
+  return {
+    x: cake.x + ((RING.cx - ROPE_CAKE.left) * fullW),
+    y: cake.y + ((RING.cy - ROPE_CAKE.top) * fullH)
+  }
+}
 
 const scaledSwingCakeBox = (instance) => {
   const box = swingCakeBox(instance)
@@ -166,6 +201,33 @@ const checkCollision = (block, line) => {
   }
   return 0
 }
+/* The rope creaks at the ENDS of the swing, not continuously.
+ *
+ * A held loop would have been the obvious thing and it is the wrong thing twice
+ * over: it needs pausing on release, on game over and on a fresh run — three
+ * places to leave it stuck droning — and a rope groaning at a constant level
+ * tells the player nothing. The turning points do: the sway is a sine of `time`
+ * whose period is set by the difficulty, so voicing the reversals lands a creak
+ * every ~570-630 ms that speeds up exactly when the hook does. It reads as the
+ * rope taking the weight at the top of the arc, and it doubles as a metronome
+ * for the drop.
+ *
+ * The reversal is read off the angle rather than computed from the clock so it
+ * stays correct through the blink edition's swingSpeedScale and through
+ * hardMode, both of which change the period underneath us.
+ */
+const voiceSwingCreak = (i, engine) => {
+  const last = i.creakAngle
+  i.creakAngle = i.angle
+  // A motionless block gives no delta to take a sign from. That is the first
+  // floor, which does not swing at all (hard = 0), so it stays silent.
+  if (last === undefined || i.angle === last) return
+  const dir = i.angle > last ? 1 : -1
+  const turned = i.creakDir !== undefined && dir !== i.creakDir
+  i.creakDir = dir
+  if (turned) playSfx(engine, 'swing')
+}
+
 const swing = (instance, engine, time) => {
   const ropeHeight = engine.getVariable(constant.ropeHeight)
   if (instance.status !== constant.swing) return
@@ -173,6 +235,7 @@ const swing = (instance, engine, time) => {
   const initialAngle = engine.getVariable(constant.initialAngle)
   i.angle = initialAngle *
     getSwingBlockVelocity(engine, time)
+  voiceSwingCreak(i, engine)
   i.weightX = i.x +
     (Math.sin(i.angle) * ropeHeight)
   i.weightY = i.y +
@@ -187,9 +250,40 @@ const checkBlockOut = (instance, engine) => {
   }
 }
 
+/* One bloop for the tower, not one per bead.
+ *
+ * Every landed layer sheds cream on its own timer, and a tall tower has a dozen
+ * layers on screen — voicing each bead would be a rattle, and the shared audio
+ * element could not keep up with it anyway. So the drip is rationed globally: at
+ * most one every DRIP_SOUND_GAP seconds, whichever layer happened to produce the
+ * bead that got through. What the player hears is an occasional drop from a
+ * dripping tower, which is the impression the visual gives too.
+ *
+ * The gate lives on the engine's variable store rather than in a module-level
+ * counter so that a fresh run starts silent-clean, and it is keyed to the
+ * animation clock already passed in, not to wall time.
+ */
+const dripSoundGap = 0.9
+
+const playDrip = (engine, time) => {
+  const last = engine.getVariable(constant.dripSoundTime) || 0
+  // First bead of a run: start the clock, stay quiet. Also covers the clock
+  // going backwards, which a restart does.
+  if (!last || time < last) {
+    engine.setVariable(constant.dripSoundTime, time)
+    return
+  }
+  if ((time - last) / 1000 < dripSoundGap) return
+  engine.setVariable(constant.dripSoundTime, time)
+  playSfx(engine, 'drip')
+}
+
 const applyLand = (engine, block, line, opts) => {
   const { blockY, keptLeft, keptWidth, isPerfect } = opts
   const i = block
+  // How much of the layer survived, measured BEFORE updateWidth() below
+  // overwrites i.width with the kept width and makes the ratio always 1.
+  const keepRatio = i.width > 0 ? Math.min(1, keptWidth / i.width) : 1
   const lastSuccessCount = engine.getVariable(constant.successCount)
   addSuccessCount(engine)
   engine.setTimeMovement(constant.moveDownMovement, 500)
@@ -225,9 +319,20 @@ const applyLand = (engine, block, line, opts) => {
   engine.setVariable(constant.currentHeight, i.height)
   // cheat detection: measured against the original block width
   const cheatWidth = engine.getVariable(constant.blockWidth) * 0.3
-  if (i.x > engine.width - (cheatWidth * 2) || i.x < -cheatWidth) {
+  if (i.x > (pl(engine) + pw(engine)) - (cheatWidth * 2) || i.x < pl(engine) - cheatWidth) {
     engine.setVariable(constant.hardMode, true)
   }
+  /* Two sounds for one landing, and they are doing different jobs. `land` is the
+   * physical event — cake meeting cake, all low end and a wet slap of cream —
+   * and it fires for every landing there is. drop / drop-perfect are the SCORING
+   * chime on top of it, and they are the pair that tell perfect apart from
+   * merely good.
+   *
+   * The thud goes first so its attack is the leading edge of the hit; the chime
+   * has no low end of its own, so the two layer rather than mask each other.
+   * playSfx, not playAudio: two landings inside a quarter of a second is normal
+   * once the hook is fast, and play() on an element already playing is silent. */
+  playSfx(engine, 'land')
   if (isPerfect) {
     i.perfect = true
     addScore(engine, true)
@@ -236,6 +341,9 @@ const applyLand = (engine, block, line, opts) => {
     addScore(engine)
     engine.playAudio('drop')
   }
+  // The customer's verdict on the layer. Applied after addScore so the tip or
+  // the docking lands on top of the landing's own points.
+  addSatisfaction(engine, getSatisfactionDelta(keepRatio))
   // Mango cream squishes out along the seam where the cake layer slammed down.
   // A perfect landing squeezes out a bigger, wider splash.
   spawnCream(engine, {
@@ -295,7 +403,7 @@ const tipBlockAction = (instance, engine, time) => {
     // tipped past the balance point — break off the corner and plummet outward
     i.rotate += (rotateSpeed / 8) * leftFix
     i.y += engine.pixelsPerFrame(engine.height * 0.7)
-    i.x += engine.pixelsPerFrame(engine.width * 0.3) * leftFix
+    i.x += engine.pixelsPerFrame(pw(engine) * 0.3) * leftFix
   }
   // Cream sheds off the doomed block the whole way — while it hinges on the
   // corner and while it plummets — so a missed layer trails mango all the way
@@ -326,6 +434,8 @@ const tipBlockAction = (instance, engine, time) => {
 
 export const blockAction = (instance, engine, time) => {
   const i = instance
+  // Frozen scene: every block holds its position, including one mid-fall.
+  if (isGameOver(engine)) return
   const ropeHeight = engine.getVariable(constant.ropeHeight)
   if (!i.visible) {
     return
@@ -338,7 +448,7 @@ export const blockAction = (instance, engine, time) => {
     // Squeeze the height along with the width so a clipped tower's next slab
     // stays cake-shaped on the rope instead of a long thin plank.
     instance.updateHeight(getBlockHeightForWidth(engine, w))
-    instance.x = engine.width / 2
+    instance.x = px(engine, 0.5)
     instance.y = ropeHeight * constant.ropeTopFactor
   }
   const line = engine.getInstance('line')
@@ -367,6 +477,14 @@ export const blockAction = (instance, engine, time) => {
       i.ay = engine.pixelsPerFrame(0.0003 * engine.height) // acceleration of gravity
       i.startDropTime = time
       i.status = constant.drop
+      /* The air on the way down. Voiced here, on the one frame the release
+       * happens, rather than anywhere in the drop case below — that runs every
+       * frame of the fall and would restart the clip forty times over.
+       *
+       * The clip is deliberately longer than a short fall: it swells in and
+       * ducks at the end, so a block that lands early is cut off during the
+       * quiet part and one that falls the full height gets the whole sweep. */
+      playSfx(engine, 'fall')
       break
     }
     case constant.drop:
@@ -448,6 +566,12 @@ export const blockAction = (instance, engine, time) => {
           const cutDepth = Math.max(leftCut, rightCut)
           i.cutJag = makeJag(blockLeft + blockRight, cutDepth)
           i.cutSide = cutSide
+          /* The shear itself. Only this branch reaches it — a landing inside the
+           * grace window keeps its full width and nothing is cut, so it stays on
+           * the landing thud alone. Played after applyLand so it layers over that
+           * thud rather than in place of it: one sound for the layer arriving,
+           * one for the overhang coming off. */
+          playSfx(engine, 'clip')
           if (leftCut > 1) {
             spawnFragment(engine, i, { left: blockLeft, width: leftCut, y: blockY, fallDir: -1, cutSide: 'right', cutJag: i.cutJag })
             // Cream bursts sideways out of the fresh break.
@@ -537,6 +661,7 @@ export const blockAction = (instance, engine, time) => {
             host: instance.name,
             hostSide: side
           })
+          playDrip(engine, time)
         }
       }
       break
