@@ -1,15 +1,21 @@
 /* Smoke-test the loading screen on both editions.
  *
  *     NODE_PATH="$(npm root -g)" node tools/check-loading.js
+ *     NODE_PATH="$(npm root -g)" node tools/check-loading.js https://mango-mania-game.vercel.app
  *
  * Asserts the three things that are easy to break and invisible in a diff: no
  * request 404s, the bar actually reaches the button (PLAY visible, panel gone),
  * and the old red/GIF screen is really gone. Camera is granted so the blink
  * page's gate can close without waiting out its grace period.
+ *
+ * Takes an optional base URL so the same assertions can be run against a
+ * deployment. A local pass does not cover the things only the CDN can get
+ * wrong -- a rewrite that sends /blink to the wrong file, an asset excluded
+ * from the upload -- and those are exactly the failures worth catching.
  */
 const { chromium } = require('playwright')
 
-const BASE = 'http://localhost:8082'
+const BASE = (process.argv[2] || 'http://localhost:8082').replace(/\/$/, '')
 
 async function check(path, label) {
   const browser = await chromium.launch()
