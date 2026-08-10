@@ -4,19 +4,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
 <title>Tower Building — Blink Edition</title>
 <link rel="icon" type="image/x-icon" href="./assets/favicon.png">
+<link rel="preload" href="./assets/background.webp" as="image" fetchpriority="high">
 <style>
+  @font-face {
+    font-family: Audex;
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url(assets/audex/audex-regular.woff) format('woff'),
+         url(assets/audex/audex-regular.ttf) format('truetype');
+  }
+  @font-face {
+    font-family: Audex;
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+    src: url(assets/audex/audex-italic.woff) format('woff'),
+         url(assets/audex/audex-italic.ttf) format('truetype');
+  }
   * { margin: 0; padding: 0; }
   img { width: 100%; }
   html { background: #fff; height: 100%; }
   body {
-    font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+    font-family: Audex, "Helvetica Neue", Arial, Helvetica, sans-serif;
     margin: 0 auto;
     text-align: center;
     width: 100%;
     height: 100%;
-    background: #f95240 url(assets/main-bg.png);
+    background: #f95240 url(assets/main-bg.webp);
     overflow: hidden;
   }
+
   @media screen and (min-height:560px){ html { font-size: 100px; } }
   @media screen and (min-height:640px){ html { font-size: 112.5px; } }
   @media screen and (min-height:720px){ html { font-size: 125px; } }
@@ -34,30 +52,64 @@
     right: 0;
     bottom: 0;
     margin: auto;
-    width: 100vw;
-    height: 100vh;
   }
   a { text-decoration: none; }
   li, ol, ul { list-style-type: none; padding: 0; margin: 0; }
   .hide { display: none; }
   .clear { clear: both; }
 
-  .loading { background-color: #f05a50; height: 100%; width: 100%; }
-  .loading .main { width: 60%; margin: 0 auto; color: #fff; }
-  .loading .main img { width: 60%; margin: 1rem auto 0; }
-  .loading .main .title { font-size: .3rem; }
-  .loading .main .text { font-size: .15rem; }
-  .loading .main .bar { height: .12rem; width: 100%; border: 3px solid #fff; border-radius: .6rem; margin: .1rem 0; }
-  .loading .main .bar .sub { height: .1rem; width: 98%; margin: .008rem auto 0; }
-  .loading .main .bar .percent { height: 100%; width: 0; background-color: #fff; border-radius: .6rem; transition: width .2s ease-out; }
-  .loading .logo { position: absolute; bottom: .3rem; left: 0; right: 0; }
-  .loading .logo img { width: 1rem; }
-  .loading .load-detail { margin-top: .06rem; font-size: .14rem; color: rgba(255,255,255,.95); min-height: .2rem; }
-  .loading .load-warn { margin-top: .04rem; font-size: .13rem; color: #ffd166; min-height: .18rem; }
+  /* ---- LOADING = the title screen, still filling in -----------------------
+     No red interstitial and no GIF: loading and landing are ONE element, so
+     the market backdrop and the logo never blink or jump between them. The
+     strip along the bottom is the spot the PLAY button lands in; the bar
+     borrows it until everything is in, then hands it back. That is the whole
+     transition -- nothing else on screen moves. */
+  .loading .load-panel { text-align: center; }
+  .loading .load-head { font-size: .155rem; letter-spacing: .02em; color: #fff; text-shadow: 0 .018rem .03rem rgba(72,26,0,.6); }
+
+  /* Candy bar: a channel sunk into the board, a gold fill with light diagonal
+     stripes, and the percent centred over the whole TRACK rather than over the
+     fill, so it does not ride off the left edge in the first second. The fill
+     is resized by width and not by scaleX -- a transform would shear the
+     stripe angle as the bar grows, and the stripes are the whole look. */
+  .loading .bar { position: relative; width: 62%; height: .135rem; margin: .06rem auto 0; border-radius: 999px; background: #5d3213; box-shadow: inset 0 .015rem .025rem rgba(0,0,0,.5), 0 .012rem 0 rgba(255,255,255,.22); overflow: hidden; }
+  .loading .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 999px; background-color: #f8b62a; background-image: repeating-linear-gradient(115deg, rgba(255,241,197,.75) 0 .028rem, rgba(255,241,197,0) .028rem .072rem); box-shadow: inset 0 .018rem 0 rgba(255,255,255,.55), inset 0 -.02rem .02rem rgba(190,100,0,.45); transition: width .25s ease-out; }
+  .loading .bar .pct { position: absolute; left: 0; right: 0; top: 0; height: 100%; line-height: .135rem; font-size: .085rem; font-weight: 700; color: #fff; text-shadow: 0 .012rem .02rem rgba(90,40,0,.8); }
+
+  .loading .tip { margin-top: .07rem; font-size: .1rem; color: #fff; text-shadow: 0 .015rem .025rem rgba(72,26,0,.6); }
+  .loading .tip b { color: #ffcf4d; }
+  /* The mock's chevrons point inward at the tip from both sides. One glyph,
+     mirrored, so the pair always matches. */
+  .loading .tip i { display: inline-block; font-style: normal; color: #ffcf4d; }
+  .loading .tip i.flip { transform: scaleX(-1); }
+  .loading .load-detail { margin-top: .05rem; font-size: .085rem; color: rgba(255,255,255,.9); min-height: .12rem; text-shadow: 0 .012rem .02rem rgba(72,26,0,.55); }
+  .loading .load-warn { margin-top: .02rem; font-size: .085rem; color: #ffd166; min-height: .12rem; text-shadow: 0 .012rem .02rem rgba(72,26,0,.55); }
 
   .content { height: 100vh; margin: 0 auto; position: relative; }
 
-  .landing .title { width: 76%; display: block; margin: 0 auto; }
+  /* The market scene, on the page rather than only on the canvas. The canvas
+     stays hidden until the load gate opens, so without this the loading screen
+     fell back to the body's brick fill -- an orange wall where the mock has a
+     mango market. Same art the engine paints, cover-fit the same way, so the
+     canvas taking over at the end changes nothing on screen. */
+  /* The scene's own colours under the art -- sky over wood, split where the
+     table edge falls -- so the very first frame is already the right picture
+     rather than the body's brick wall flashing through, and so the seam while
+     the backdrop decodes top-down blends instead of cutting. The
+     <link rel=preload> in <head> starts that download before the stylesheet is
+     even parsed. */
+  .landing {
+    position: relative; height: 100%;
+    background: url(assets/background.webp) center / cover no-repeat,
+                linear-gradient(#7fc4ee 0%, #8fd0f2 46%, #c98a45 58%, #9a5f2c 100%);
+  }
+
+  /* Reserve the sign's box from the first frame and keep it invisible until
+     its pixels are actually decoded. It is a tall canvas on a swinging element:
+     painting it half-downloaded shows a cropped MANGO wheeling off the corner,
+     which is exactly what the throttled screenshot caught. */
+  .landing .title { width: 76%; display: block; margin: 0 auto; aspect-ratio: 2 / 3; opacity: 0; transition: opacity .35s ease-out; }
+  .landing .title.ready { opacity: 1; }
   .landing .action-1 { position: relative; top: -0.9rem; }
   .landing .logo { width: 30%; position: absolute; right: .2rem; top: .2rem; }
   .landing .action-2 { position: absolute; bottom: .15rem; width: 100%; }
@@ -74,25 +126,133 @@
   @keyframes sw { 0% { transform: rotate(15deg); transform-origin: top center; } 100% { transform: rotate(-15deg); transform-origin: top center; } }
 
   .modal .mask { background-color: #000; opacity: .6; position: fixed; height: 100%; width: 100%; top: 0; left: 0; }
-  .modal .modal-content { position: fixed; height: 100%; width: 90%; margin-top: .3rem; top: 0; }
-  .modal .main { width: 85%; margin: 0 auto; }
-  .modal .container { position: relative; }
-  .modal .bg { width: 100%; position: absolute; top: 0; left: 0; }
-  .modal .modal-main { width: 100%; position: absolute; top: 0; left: 0; margin-top: -.4rem; }
-  .modal .over-img { width: 80%; margin: .8rem auto 0; }
-  .modal .over-score { margin-top: -.2rem; font-size: .5rem; color: #ff735c; text-shadow: -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff; }
-  .modal .tip { font-size: .16rem; color: #9b724e; }
-  .modal .over-button-b { width: 70%; margin: .1rem auto 0; cursor: pointer; }
+  .modal .modal-content { position: fixed; height: 100%; width: 90%; top: 0; left: 0; right: 0; margin: 0 auto; display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; }
 
-  .wxShare { background: #000; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 11; opacity: .9; }
-  .wxShare img { width: 50%; float: right; margin: 10px 10px 0 0; }
+  /* ---- game over score summary -----------------------------------------
+     assets/result.webp is the whole static card: banner, heading, the two
+     empty boxes and the cake. Everything below is an overlay positioned as a
+     percentage of that art, so the numbers stay welded to their boxes at any
+     size. The percentages come straight out of the PNG — the content column
+     runs 13.96%-84.96% of its width, the score box 27.21%-50.46% and the
+     stats box 53.58%-68.03% of its height. */
+  .result { position: relative; width: 98%; }
+  .result-bg { display: block; width: 100%; }
+  .rs-score, .rs-stats, .rs-try, .rs-actions, .rs-spark { position: absolute; }
+
+  .rs-score { left: 15%; width: 42%; top: 27.21%; height: 23.25%; display: -webkit-box; display: flex; -webkit-box-orient: vertical; -webkit-box-direction: normal; flex-direction: column; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; }
+  .rs-score-label { font-size: calc(var(--gw) * .0501); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #54371d; }
+  .rs-score-value { margin-top: calc(var(--gw) * .0128); font-size: calc(var(--gw) * .1332); white-space: nowrap; font-weight: 700; line-height: 1; color: #4f2e08; }
+
+  /* The two gold sparkles the mock puts left of the score. Square boxes cut to
+     a four-point star — the art has none baked in. */
+  .rs-spark { background: #ffc531; -webkit-clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
+  .rs-spark.a { left: 14.4%; top: 34.6%; width: 4.4%; padding-bottom: 4.4%; }
+  .rs-spark.b { left: 15.6%; top: 41.4%; width: 3.1%; padding-bottom: 3.1%; }
+
+  .rs-stats { left: 13.96%; right: 15.04%; top: 53.58%; height: 14.45%; box-sizing: border-box; padding: 0 4.5%; display: -webkit-box; display: flex; -webkit-box-orient: vertical; -webkit-box-direction: normal; flex-direction: column; }
+  .rs-row { -webkit-box-flex: 1; flex: 1 1 0; display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; }
+  .rs-row + .rs-row { border-top: 1px solid rgba(183, 142, 96, .28); }
+  .rs-icon { -webkit-box-flex: 0; flex: none; width: calc(var(--gw) * .0724); height: calc(var(--gw) * .0724); border-radius: 50%; display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; }
+  .rs-icon svg { display: block; width: 64%; height: 64%; }
+  .rs-icon-tower { background: #2f6e33; }
+  .rs-icon-best { background: #f5a623; }
+  .rs-label { -webkit-box-flex: 1; flex: 1 1 auto; min-width: 0; margin-left: calc(var(--gw) * .0256); text-align: left; font-size: calc(var(--gw) * .0383); font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #5b3d22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rs-val { -webkit-box-flex: 0; flex: none; display: -webkit-box; display: flex; -webkit-box-orient: vertical; -webkit-box-direction: normal; flex-direction: column; -webkit-box-align: center; align-items: center; line-height: 1; }
+  .rs-val.inline { -webkit-box-orient: horizontal; flex-direction: row; }
+  .rs-val b { font-size: calc(var(--gw) * .0533); font-weight: 700; color: #3e7d18; }
+  .rs-val em { margin-top: calc(var(--gw) * .0085); font-style: normal; font-size: calc(var(--gw) * .0277); letter-spacing: .06em; text-transform: uppercase; color: #8a6a46; }
+  .rs-val .orange { color: #f0910c; }
+  .rs-badge { margin-left: calc(var(--gw) * .0149); padding: calc(var(--gw) * .0085) calc(var(--gw) * .0117); border-radius: calc(var(--gw) * .016); background: #e4502a; color: #fff; font-style: normal; font-size: calc(var(--gw) * .0202); font-weight: 700; line-height: 1.2; letter-spacing: .02em; text-transform: uppercase; }
+
+  /* Room to breathe inside every summary/leaderboard button. box-sizing is
+     border-box above, so this eats into the button rather than widening it, and
+     the content is centred, so the padding only bites once a label grows long
+     enough to reach for the edge -- which is exactly when it should. */
+  .rs-btn { padding: 0 calc(var(--gw) * .026); -webkit-appearance: none; appearance: none; box-sizing: border-box; border: 0; font-family: inherit; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .rs-btn svg { display: block; -webkit-box-flex: 0; flex: none; }
+  .rs-btn:active { -webkit-transform: scale(.98); transform: scale(.98); }
+  .rs-try { left: 13.96%; right: 15.04%; top: 71.68%; height: 7.42%; border-radius: 999px; font-size: calc(var(--gw) * .0618); color: #fff; background: linear-gradient(#82b415, #4d8a0c); border: calc(var(--gw) * .0085) solid #3a6a09; box-shadow: inset 0 calc(var(--gw) * .0096) 0 rgba(255, 255, 255, .32), 0 calc(var(--gw) * .0096) 0 rgba(48, 88, 8, .5); text-shadow: 0 calc(var(--gw) * .0043) 0 rgba(0, 0, 0, .25); }
+  .rs-try svg { width: calc(var(--gw) * .0533); height: calc(var(--gw) * .0533); margin-right: calc(var(--gw) * .0234); }
+  .rs-actions { left: 13.96%; right: 15.04%; top: 81.97%; height: 5.73%; display: -webkit-box; display: flex; }
+  /* The paired buttons are half the width of Try Again with nearly the same
+     labels, so they get a tighter gutter than the base rule. */
+  .rs-actions .rs-btn { padding: 0 calc(var(--gw) * .016); -webkit-box-flex: 1; flex: 1 1 0; height: 100%; border-radius: calc(var(--gw) * .032); }
+  .rs-lead { margin-right: calc(var(--gw) * .0277); font-size: calc(var(--gw) * .0309); color: #fff; background: linear-gradient(#fdc21e, #f6980a); border: calc(var(--gw) * .0075) solid #dd7d03; box-shadow: inset 0 calc(var(--gw) * .0075) 0 rgba(255, 255, 255, .38), 0 calc(var(--gw) * .0085) 0 rgba(190, 105, 4, .5); text-shadow: 0 calc(var(--gw) * .0032) 0 rgba(0, 0, 0, .2); }
+  .rs-home { font-size: calc(var(--gw) * .0405); color: #5c3213; background: linear-gradient(#f8e3c2, #eecfa2); border: calc(var(--gw) * .0075) solid #d6ae7c; box-shadow: inset 0 calc(var(--gw) * .0075) 0 rgba(255, 255, 255, .6), 0 calc(var(--gw) * .0085) 0 rgba(190, 155, 110, .5); }
+  .rs-lead svg, .rs-home svg { width: calc(var(--gw) * .0362); height: calc(var(--gw) * .0362); margin-right: calc(var(--gw) * .0107); }
+
+  /* ---- leaderboard ------------------------------------------------------
+     assets/leaderboard.webp is the whole static card: banner, trophy, the
+     "Top Players" heading and the empty cream body. Only the six rows and the
+     two buttons are drawn here, positioned as percentages of that art so they
+     stay in place at any screen size.
+
+     The percentages are measured off the PNG (1043x1508) after mapping the
+     approved mock through the shared landmarks — the panel's inner orange
+     border (x 128.5..889.5, y 190..1241) sits in the same pixels in both.
+     Note the panel is NOT centred in its own canvas (its centre is 48.8%),
+     which is why the left and right insets differ. */
+  .board { position: relative; width: 98%; }
+  .board-bg { display: block; width: 100%; }
+  .lb-list, .lb-actions { position: absolute; }
+  .lb-list { left: 15.29%; right: 17.55%; top: 26.47%; height: 44.27%; box-sizing: border-box; border: 1px solid rgba(212, 168, 109, .6); border-radius: calc(var(--gw) * .0373); background: rgba(255, 248, 228, .55); overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: rgba(198, 160, 110, .55) transparent; display: flex; flex-direction: column; }
+  .lb-list::-webkit-scrollbar { width: calc(var(--gw) * .012); }
+  .lb-list::-webkit-scrollbar-thumb { border-radius: 99px; background: rgba(198, 160, 110, .55); }
+  /* A sixth of the box each, so a row keeps its design height whether two
+     people have played or twenty: a part-full board leaves the space below it
+     empty instead of stretching one row across the whole panel, and a full one
+     scrolls rather than squeezing every row into a sliver. The basis is a
+     percentage of the list, so it still needs no per-screen tuning. */
+  .lb-row { flex: 0 0 16.6667%; min-height: 0; box-sizing: border-box; padding: 0 calc(var(--gw) * .0234); display: flex; align-items: center; will-change: transform; }
+  /* Reordering is a FLIP: the row is translated back to its old seat and then
+     released, so only transform animates and a reshuffle never hits layout. */
+  .lb-row.sliding { transition: transform .62s cubic-bezier(.22, .9, .24, 1); z-index: 2; }
+  .lb-row.arriving { animation: lbIn .45s ease-out both; }
+  @keyframes lbIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+  /* A brief flash on the rows that gained ground, once the sliding has settled. */
+  .lb-row.climbed { animation: lbPop .5s ease-out; }
+  @keyframes lbPop { 0%, 100% { background-color: transparent; } 45% { background-color: rgba(255, 214, 102, .85); } }
+  @media (prefers-reduced-motion: reduce) {
+    .lb-row.sliding { transition: none; }
+    .lb-row.arriving, .lb-row.climbed { animation: none; }
+  }
+  /* Shown in place of rows when there is nothing to rank. */
+  .lb-empty { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 8%; font-size: calc(var(--gw) * .034); line-height: 1.45; color: #9a7a52; }
+  .lb-empty b { display: block; margin-bottom: calc(var(--gw) * .012); font-size: calc(var(--gw) * .042); color: #7a5426; }
+  .lb-row + .lb-row { border-top: 1px solid rgba(198, 160, 110, .32); }
+  .lb-row.gold { background: linear-gradient(rgba(255, 241, 190, .9), rgba(255, 233, 162, .9)); }
+  .lb-row.me { background: linear-gradient(rgba(253, 245, 175, .95), rgba(249, 231, 128, .95)); border-top: 1px solid rgba(212, 168, 109, .6); }
+  /* Medal discs stand in for the mock's laurel wreaths: same gold/silver/bronze
+     read, built from the bevel language the buttons already use. */
+  .lb-medal { flex: none; display: block; width: calc(var(--gw) * .082); height: auto; }
+  .lb-rank { flex: none; box-sizing: border-box; width: calc(var(--gw) * .065); height: calc(var(--gw) * .065); margin: 0 calc(var(--gw) * .0085); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: calc(var(--gw) * .036); font-weight: 700; line-height: 1; color: #7a5426; background: linear-gradient(#fdf1d2, #f1dcac); border: calc(var(--gw) * .005) solid #d9b57d; box-shadow: inset 0 calc(var(--gw) * .004) 0 rgba(255, 255, 255, .7); }
+  .lb-rank.mine { color: #fff; background: linear-gradient(#fdb62a, #ef8c05); border-color: #cd7103; }
+  .lb-face { flex: none; display: block; width: calc(var(--gw) * .078); height: calc(var(--gw) * .078); margin-left: calc(var(--gw) * .014); border-radius: 50%; object-fit: cover; background: #e7e3dd; box-shadow: 0 0 0 calc(var(--gw) * .005) rgba(212, 168, 109, .8); }
+  /* min-width:0 is what lets a long name ellipsis instead of pushing the score
+     off the right edge of the row. */
+  .lb-name { flex: 1 1 auto; min-width: 0; margin: 0 calc(var(--gw) * .013) 0 calc(var(--gw) * .02); text-align: left; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+  .lb-name b, .lb-name i { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lb-name b { font-size: calc(var(--gw) * .036); font-weight: 700; line-height: 1.2; color: #4a3016; }
+  .lb-name i { margin-top: calc(var(--gw) * .004); font-style: normal; font-size: calc(var(--gw) * .025); font-weight: 400; line-height: 1.2; letter-spacing: .02em; color: #9a7a52; }
+  .lb-row.me .lb-name b { color: #3e7d18; }
+  .lb-row.me .lb-name i { color: #5f8f3c; }
+  /* Marks the player's own row wherever it sits. The row tint alone reads as
+   * "highlighted", not as "you", and on a shared laptop several people know
+   * each other's names — the badge is the part that says which one is yours. */
+  .lb-you { flex: none; margin-right: calc(var(--gw) * .022); padding: calc(var(--gw) * .008) calc(var(--gw) * .022); border-radius: 999px; font-size: calc(var(--gw) * .026); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; line-height: 1; color: #fff; background: linear-gradient(#5aa832, #3e7d18); box-shadow: 0 calc(var(--gw) * .003) 0 rgba(0, 0, 0, .18); }
+  .lb-score { flex: none; font-size: calc(var(--gw) * .049); font-weight: 700; line-height: 1; color: #5b3a12; }
+  .lb-actions { left: 17.25%; right: 19.17%; top: 73.04%; height: 6.42%; display: flex; }
+  .lb-actions .rs-btn { padding: 0 calc(var(--gw) * .016); flex: 1 1 0; height: 100%; border-radius: 999px; font-size: calc(var(--gw) * .032); letter-spacing: .02em; }
+  .lb-actions .rs-home { margin-right: calc(var(--gw) * .0256); }
+  .lb-play { color: #fff; background: linear-gradient(#82b415, #4d8a0c); border: calc(var(--gw) * .0075) solid #3a6a09; box-shadow: inset 0 calc(var(--gw) * .0085) 0 rgba(255, 255, 255, .32), 0 calc(var(--gw) * .0085) 0 rgba(48, 88, 8, .5); text-shadow: 0 calc(var(--gw) * .0032) 0 rgba(0, 0, 0, .25); }
+  .lb-actions svg { width: calc(var(--gw) * .0383); height: calc(var(--gw) * .0383); margin-right: calc(var(--gw) * .0107); }
 
   @font-face {
     font-family: wenxue;
     src: url(assets/wenxue.eot);
     src: url(assets/wenxue.eot), url(assets/wenxue.woff), url(assets/wenxue.ttf), url(assets/wenxue.svg);
   }
-  .font-wenxue { font-family: wenxue; }
+  .font-wenxue { font-family: Audex, wenxue; }
 
   /* ============================================================
      INVISIBLE WEBCAM — used ONLY for blink detection.
@@ -127,41 +287,169 @@
     height: 10px;
     border-radius: 50%;
     background: #ff5252;
-    box-shadow: 0 0 6px rgba(255,82,82,.8);
+    /* A neutral ring plus a normal elevation shadow, not a coloured halo. The
+       dot sits over whatever backdrop art is on screen — bright sky through to
+       deep space — so it needs contrast on any hue; a white ring gives that at
+       every state, where a glow in the dot's own colour would vanish against a
+       backdrop of the same colour. */
+    box-shadow: 0 0 0 2px rgba(255,255,255,.92), 0 1px 3px rgba(0,0,0,.4);
     z-index: 200;
     pointer-events: none;
-    transition: background .3s, box-shadow .3s;
+    transition: background .3s;
   }
-  #blinkDot.connecting { background: #ffb300; box-shadow: 0 0 6px rgba(255,179,0,.8); }
-  #blinkDot.ready { background: #ffb300; box-shadow: 0 0 6px rgba(255,179,0,.8); }
-  #blinkDot.active { background: #00e676; box-shadow: 0 0 6px rgba(0,230,118,.9); }
+  #blinkDot.connecting { background: #ffb300; }
+  #blinkDot.ready { background: #ffb300; }
+  #blinkDot.active { background: #00e676; }
   #blinkDot.active.pulse { animation: dotPulse 1.2s ease-in-out infinite; }
-  @keyframes dotPulse { 0%,100% { box-shadow: 0 0 4px rgba(0,230,118,.6); } 50% { box-shadow: 0 0 10px rgba(0,230,118,1); } }
+  /* Scale, not shadow: transform is composited, and the size change reads as a
+     heartbeat at 10px where a shadow radius change barely registers. */
+  @keyframes dotPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+
+  /* ---- profile entry screen ---------------------------------------------
+     Sized off --gw (the canvas width set in JS) rather than the viewport, so
+     the text and avatar chips scale with the card itself on every screen. */
+  .profile { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  /* Scoped to :not(.hide) because .hide is declared earlier in this sheet —
+     a bare display:flex here has equal specificity and would win the cascade,
+     leaving the card on screen from page load. */
+  .profile:not(.hide) { display: flex; align-items: center; justify-content: center; }
+  .profile .card { position: relative; width: 86%; }
+  .profile .card-bg { display: block; width: 100%; }
+  .profile .form { position: absolute; left: 11%; right: 11%; top: 24%; bottom: 6.5%; display: flex; flex-direction: column; justify-content: flex-start; }
+  /* Groups stack from the top so the avatar row sits high on the card; the
+     last group is pinned to the bottom instead of letting space-between push
+     everything toward the middle. */
+  .profile .form > *:last-child { margin-top: auto; }
+  .profile .label { font-size: calc(var(--gw) * .038); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #8a5312; text-shadow: 0 1px 0 rgba(255,255,255,.6); margin-bottom: calc(var(--gw) * .022); }
+  /* Breathing room between the name field and the avatar row's heading, and
+     between that heading and the avatars themselves. */
+  .profile .label.spaced { margin-top: calc(var(--gw) * .05); margin-bottom: calc(var(--gw) * .03); }
+  .profile .name-input { display: block; width: 100%; box-sizing: border-box; height: calc(var(--gw) * .13); padding: 0 calc(var(--gw) * .04); font-family: inherit; font-size: calc(var(--gw) * .056); font-weight: 700; text-align: center; color: #5c3a1e; background: #fff6e0; border: calc(var(--gw) * .011) solid #e79a2b; border-radius: calc(var(--gw) * .05); outline: 0; -webkit-appearance: none; box-shadow: inset 0 calc(var(--gw) * .008) calc(var(--gw) * .016) rgba(180,120,40,.25); }
+  /* Name and company share one line. Each column shrinks to half the form, so
+     the font and padding step down to keep a full 12-character name readable
+     instead of scrolling out of view. min-width:0 is what lets a flex child
+     shrink below its own content width. */
+  .profile .row { display: flex; align-items: flex-start; }
+  .profile .field { flex: 1 1 0; min-width: 0; }
+  .profile .field + .field { margin-left: calc(var(--gw) * .035); }
+  .profile .row .label { font-size: calc(var(--gw) * .032); margin-bottom: calc(var(--gw) * .018); }
+  .profile .row .name-input { height: calc(var(--gw) * .115); padding: 0 calc(var(--gw) * .018); font-size: calc(var(--gw) * .04); border-radius: calc(var(--gw) * .045); letter-spacing: -.005em; }
+  .profile .row .name-input::placeholder { font-size: calc(var(--gw) * .04); }
+  .profile .name-input::placeholder { color: #c8a068; font-weight: 400; }
+  .profile .name-input:focus { border-color: #d4790f; background: #fffdf5; }
+  .profile .avatars { display: flex; flex-wrap: wrap; justify-content: center; }
+  /* The avatar art ships with its own gold circular frame, so no chip styling
+     here — selection is shown by lifting the sprite out of a dimmed row. */
+  .profile .avatar { width: 26%; position: relative; margin: 0 calc(var(--gw) * .018) calc(var(--gw) * .022); cursor: pointer; -webkit-tap-highlight-color: transparent; opacity: .6; filter: saturate(.5); transition: transform .16s ease, opacity .16s ease; }
+  .profile .avatar img { display: block; width: 100%; }
+  .profile .avatar.on { opacity: 1; filter: drop-shadow(0 0 calc(var(--gw) * .02) rgba(212,121,15,.9)); transform: scale(1.08); }
+  /* Nudged down with position, not margin: the card's content already overflows
+     its box, so margin-top:auto on the last group resolves to zero and shifting
+     the form's bottom edge would move nothing. */
+  .profile .go { display: block; width: 62%; margin: 0 auto; position: relative; top: calc(var(--gw) * .05); cursor: pointer; filter: drop-shadow(0 .03rem .05rem rgba(0,0,0,.35)); }
+  .profile .go:active { transform: scale(.96); }
+  .profile .blink-tip { font-size: calc(var(--gw) * .032); color: #a9702a; margin-top: calc(var(--gw) * .02); }
+  /* ---- control-mode chooser ---------------------------------------------
+     Same stock as the profile card, so picking how you play and typing your
+     name read as one step. The two illustrations ARE the buttons —
+     mode-card.webp is only the frame around them, and these three percentages
+     come straight out of tools/make-mode-cards.py. Height is left to the image
+     so the artwork can never letterbox. */
+  .mode { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  .mode:not(.hide) { display: flex; align-items: center; justify-content: center; }
+  .mode .card { position: relative; width: 94%; }
+  .mode .card-bg { display: block; width: 100%; }
+  .mode-pick { position: absolute; top: 28.65%; width: 39%; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .16s ease; filter: drop-shadow(0 .04rem .06rem rgba(0,0,0,.28)); }
+  .mode-pick[data-mode=blink] { left: 5.8%; }
+  .mode-pick[data-mode=tap] { left: 55.2%; }
+  .mode-pick:active { transform: scale(.955); }
+  @media (hover: hover) { .mode-pick:hover { transform: translateY(-1.5%) scale(1.025); } }
+  .shake { animation: sk .4s ease-in-out; }
+  @keyframes sk { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6%); } 40%,80% { transform: translateX(6%); } }
+  .popIn { animation: pi .35s cubic-bezier(.22,1,.36,1); }
+  @keyframes pi { 0% { transform: scale(.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .popOut { animation: po .3s ease-in forwards; }
+  @keyframes po { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(.7); opacity: 0; } }
+
+  /* ============================================================
+     TAKE-THE-LEAD CELEBRATION
+     Fires mid-run the moment the player's score passes the top of
+     the board. Sits over the game canvas and takes no input — the
+     player is still stacking underneath it.
+     ============================================================ */
+  .party-fx { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 150; pointer-events: none; }
+  .party-fx-canvas { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  .party-banner { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); display: flex; align-items: center; gap: calc(var(--gw) * .03); padding: calc(var(--gw) * .028) calc(var(--gw) * .055); white-space: nowrap; border-radius: 999px; background: linear-gradient(#fff6dc, #ffe9ae); border: calc(var(--gw) * .006) solid #d9b57d; box-shadow: 0 calc(var(--gw) * .012) calc(var(--gw) * .03) rgba(90, 55, 10, .35); animation: partyIn .5s cubic-bezier(.16, 1, .3, 1) both; }
+  .party-icon { flex: none; width: calc(var(--gw) * .09); height: auto; }
+  .party-icon-l { animation: partyTilt 1.1s ease-in-out infinite; }
+  .party-icon-r { animation: partyTilt 1.1s ease-in-out infinite reverse; }
+  .party-text { display: flex; flex-direction: column; line-height: 1.15; }
+  .party-text b { font-size: calc(var(--gw) * .058); color: #7a5426; }
+  .party-text i { font-style: normal; font-size: calc(var(--gw) * .032); color: #a9702a; }
+  .party-out .party-banner { animation: partyOut .38s ease-in forwards; }
+  @keyframes partyIn { 0% { transform: translateX(-50%) scale(.6); opacity: 0; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
+  @keyframes partyOut { 0% { transform: translateX(-50%) scale(1); opacity: 1; } 100% { transform: translateX(-50%) scale(.85); opacity: 0; } }
+  @keyframes partyTilt { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .party-banner, .party-icon-l, .party-icon-r { animation: none; }
+  }
 </style>
 </head>
 <body>
   <canvas id="canvas" class="hide"></canvas>
 
   <div class="content">
-    <!-- LOADING SCREEN: game assets + blink model + camera all initialize here -->
-    <div class="loading">
-      <div class="main">
-        <img src="./assets/main-loading.gif">
-        <div class="progress">
-          <div class="title font-wenxue">0%</div>
-          <div class="bar"><div class="sub"><div class="percent"></div></div></div>
-          <div class="text">Loading...</div>
+    <!-- TITLE SCREEN. It is on from the first frame and it is the loading
+         screen too: the logo hangs where it always does, and .action-2 holds
+         the progress panel until every asset, the blink model and the camera
+         are in, at which point it holds the PLAY button instead. -->
+    <div class="landing loading">
+      <div class="action-1"><img src="./assets/main-index-title.webp" class="title swing"></div>
+      <div class="action-2">
+        <div class="load-panel">
+          <div class="load-head">Loading...</div>
+          <div class="bar"><div class="fill"></div><div class="pct">0%</div></div>
+          <div class="tip"><i>⇒</i> <b>Tip:</b> Stack cakes higher to earn bigger rewards! <i class="flip">⇒</i></div>
           <div class="load-detail" id="loadDetail">Preparing…</div>
           <div class="load-warn" id="loadWarn"></div>
         </div>
+        <img id="start" src="./assets/main-index-start.webp" class="start hide">
       </div>
     </div>
 
-    <!-- LANDING SCREEN -->
-    <div class="landing hide">
-      <div class="action-1"><img src="./assets/main-index-title.webp" class="title swing"></div>
-      <div class="action-2">
-        <img id="start" src="./assets/main-index-start.webp" class="start">
+    <!-- CONTROL MODE CHOOSER -->
+    <div id="mode" class="mode hide">
+      <div class="card">
+        <img src="./assets/mode-card.webp" class="card-bg" alt="How will you play?" decoding="async">
+        <img class="mode-pick" data-mode="blink" src="./assets/mode-blink.webp" alt="Play by blinking" decoding="async">
+        <img class="mode-pick" data-mode="tap" src="./assets/mode-tap.webp" alt="Play by tapping" decoding="async">
+      </div>
+    </div>
+
+    <!-- PROFILE ENTRY SCREEN -->
+    <div id="profile" class="profile hide">
+      <div class="card">
+        <img src="./assets/profile.webp" class="card-bg" decoding="async">
+        <div class="form">
+          <div class="row">
+            <div class="field">
+              <div class="label">Name</div>
+              <input id="player-name" class="name-input" type="text" maxlength="12" placeholder="Your name" autocomplete="off" autocapitalize="words" spellcheck="false">
+            </div>
+            <div class="field">
+              <div class="label">Company</div>
+              <input id="player-company" class="name-input" type="text" maxlength="16" placeholder="Optional" autocomplete="off" autocapitalize="words" spellcheck="false">
+            </div>
+          </div>
+          <div>
+            <div class="label spaced">Pick Your Avatar</div>
+            <div id="avatars" class="avatars"></div>
+          </div>
+          <div>
+            <img id="profile-go" src="./assets/main-index-start.webp" class="go">
+            <div class="blink-tip">Blink drops the cake — tap the buttons</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -169,28 +457,57 @@
     <div id="modal" class="modal hide">
       <div class="mask"></div>
       <div class="js-modal-content modal-content">
-        <div class="main">
-          <div class="container">
-            <img src="./assets/main-modal-bg.png" class="bg">
-            <div class="modal-main">
-              <div id="over-modal" class="hide js-modal-card">
-                <img src="./assets/main-modal-over.png" class="over-img">
-                <div id="score" class="over-score font-wenxue"></div>
-                <div id="over-zero" class="hide">
-                  <div class="tip">
-                    <p>Try Again!</p>
-                    <img src="./assets/main-modal-again-b.png" class="over-button-b js-reload">
-                    <img src="./assets/main-modal-invite-b.png" class="over-button-b js-invite">
-                  </div>
-                </div>
-              </div>
+        <div id="over-modal" class="result hide">
+          <img src="./assets/result.webp" class="result-bg" alt="Score summary" decoding="async">
+          <i class="rs-spark a"></i><i class="rs-spark b"></i>
+          <div class="rs-score">
+            <div class="rs-score-label">Your Score</div>
+            <div id="score" class="rs-score-value">0</div>
+          </div>
+          <div class="rs-stats">
+            <div class="rs-row">
+              <span class="rs-icon rs-icon-tower">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="4.4" r="1.6" fill="#fff"/><rect x="8.3" y="6.9" width="7.4" height="3.5" rx="1.2" fill="#fff"/><rect x="5.9" y="11.3" width="12.2" height="3.8" rx="1.3" fill="#fff"/><rect x="3.5" y="16" width="17" height="4" rx="1.4" fill="#fff"/></svg>
+              </span>
+              <span class="rs-label">Tower Height</span>
+              <span class="rs-val"><b id="result-height">0</b><em>Layers</em></span>
             </div>
+            <div class="rs-row">
+              <span class="rs-icon rs-icon-best">
+                <svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z" fill="#fff"/></svg>
+              </span>
+              <span class="rs-label">Best Score</span>
+              <span class="rs-val inline"><b id="result-best" class="orange">0</b><i id="result-newbest" class="rs-badge hide">New<br>Best!</i></span>
+            </div>
+          </div>
+          <button type="button" class="rs-btn rs-try js-reload">
+            <svg viewBox="0 0 24 24"><path d="M7 4.3l13.2 7.7L7 19.7z" fill="#fff"/></svg><span>Try Again</span>
+          </button>
+          <div class="rs-actions">
+            <button type="button" class="rs-btn rs-lead js-leaderboard">
+              <svg viewBox="0 0 24 24"><path d="M7 2.6h10v5.1a5 5 0 0 1-10 0z" fill="#fff"/><path d="M7 4.2H4.2v2.1A3.7 3.7 0 0 0 7.9 10M17 4.2h2.8v2.1A3.7 3.7 0 0 1 16.1 10" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M10.8 12.2h2.4v3.4h-2.4z" fill="#fff"/><rect x="7.4" y="15.6" width="9.2" height="2.8" rx="1.1" fill="#fff"/></svg><span>Leaderboard</span>
+            </button>
+            <button type="button" class="rs-btn rs-home js-home">
+              <svg viewBox="0 0 24 24"><path d="M12 3.2L2.6 11.1h2.7v9h5.1v-5.6h3.2v5.6h5.1v-9h2.7z" fill="currentColor"/></svg><span>Home</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- LEADERBOARD -->
+        <div id="board-modal" class="board hide">
+          <img src="./assets/leaderboard.webp" class="board-bg" alt="Leaderboard" decoding="async">
+          <div id="lb-list" class="lb-list"></div>
+          <div class="lb-actions">
+            <button type="button" class="rs-btn rs-home js-home">
+              <svg viewBox="0 0 24 24"><path d="M12 3.2L2.6 11.1h2.7v9h5.1v-5.6h3.2v5.6h5.1v-9h2.7z" fill="currentColor"/></svg><span>Home</span>
+            </button>
+            <button type="button" class="rs-btn lb-play js-reload">
+              <svg viewBox="0 0 24 24"><path d="M7 4.3l13.2 7.7L7 19.7z" fill="#fff"/></svg><span>Play Again</span>
+            </button>
           </div>
         </div>
       </div>
     </div>
-
-    <div class="wxShare hide"><img src="./assets/main-share-icon.png"></div>
   </div>
 
   <!-- Invisible webcam feed (blink monitoring only — never displayed) -->
@@ -201,6 +518,12 @@
 
   <!-- Tower game bundle (exposes window.TowerGame) -->
   <script src="./dist/main.js"></script>
+
+  <!-- Global leaderboard client (exposes window.MangoBoard) -->
+  <script src="./assets/leaderboard-client.js"></script>
+
+  <!-- Take-the-lead celebration (exposes window.MangoParty) -->
+  <script src="./assets/celebrate.js"></script>
 
   <script type="module">
   /* ============================================================
@@ -226,13 +549,13 @@
      DOM REFS
      ============================================================ */
   const video       = document.getElementById('webcam');
-  const loadingEl   = document.querySelector('.loading');
   const landingEl   = document.querySelector('.landing');
   const canvasEl    = document.getElementById('canvas');
   const startBtn    = document.getElementById('start');
   const modalEl     = document.getElementById('modal');
-  const loadTitle   = document.querySelector('.loading .title');
-  const loadBar     = document.querySelector('.loading .percent');
+  const loadPanel   = document.querySelector('.load-panel');
+  const loadPct     = document.querySelector('.loading .pct');
+  const loadBar     = document.querySelector('.loading .fill');
   const loadDetail  = document.getElementById('loadDetail');
   const loadWarn    = document.getElementById('loadWarn');
   const blinkDot    = document.getElementById('blinkDot');
@@ -261,17 +584,25 @@
   // Loading progress (0..1 each; combined for the bar)
   let gameProgress = 0;
   let modelProgress = 0;
+  let pageProgress = 0;
   let gameDone = false;
   let modelDone = false;
+  let pageDone = false;
   let cameraOk = false;
   let cameraDenied = false;
+  let camSettled = false;   // camera has either started or been refused
   let allReady = false;
 
   // Game
   let game = null;
   let gameStart = false;
-  let landingShownAt = 0;
+  /* gameStart means "the player has left the title screen"; runStarted means
+   * "there is a run to drop a block into". They used to be close enough to
+   * share a flag, but the mode chooser and the profile card both sit in the
+   * gap between them, and a blink landing in that gap must do nothing. */
+  let runStarted = false;
   let score = 0;
+  let successCount = 0;
 
   /* ============================================================
      CONNECTION DOT STATES
@@ -308,16 +639,43 @@
         }
       }
     } catch (e) { /* ignore */ }
-    // Warm the SFX elements with a silent play so later drop/game-over sounds
-    // aren't blocked by autoplay policy on first use.
-    ['drop-perfect', 'drop', 'game-over', 'rotate'].forEach((name) => {
+    /* Warm every effect with a silent play so the first real one is not
+     * swallowed by the autoplay policy.
+     *
+     * The mute has to be UNDONE, and that is the whole trick. Warming used to
+     * set muted=true, start the clip and walk away — which worked, in the sense
+     * that the element was unblocked, and failed completely, in the sense that
+     * it stayed muted for the rest of the session. Game over was silent in this
+     * edition for exactly that reason while the tap page, which never warms
+     * anything, played it fine.
+     *
+     * Rewound as well as unmuted: a warmed element is left a few milliseconds
+     * in, and playSfx only rewinds when currentTime > 0 has been reached, so
+     * without this the first play could start mid-clip.
+     *
+     * The list is every effect the engine owns, not just the four that used to
+     * be here — there is no reason for `land` to be treated differently from
+     * `drop`, and a partial list is how this bug got missed. */
+    [
+      'drop-perfect', 'drop', 'game-over', 'rotate', 'click',
+      'swing', 'fall', 'land', 'clip', 'drip',
+      'react-happy', 'react-ok', 'react-angry',
+      'flight-plane', 'flight-rocket', 'flight-birds', 'flight-comet', 'celebrate'
+    ].forEach((name) => {
       try {
         const a = game.getAudio(name);
-        if (a && a.paused) {
-          a.muted = true;
-          const p2 = a.play();
-          if (p2 !== undefined) p2.catch(() => {});
-        }
+        if (!a || !a.paused) return;
+        const level = a.volume;
+        a.muted = true;
+        const done = () => {
+          a.pause();
+          try { a.currentTime = 0; } catch (e) { /* not seekable */ }
+          a.muted = false;
+          a.volume = level;
+        };
+        const p2 = a.play();
+        if (p2 === undefined) done();
+        else p2.then(done).catch(done);
       } catch (e) { /* ignore */ }
     });
   }
@@ -341,12 +699,31 @@
   }
 
   /* ============================================================
-     LOADING UI (assets + model share one progress bar)
+     LOADING UI
+
+     Four things have to be in before PLAY means anything, and each reports on
+     its own clock: the engine's sprites and audio, the MediaPipe model in the
+     worker, the camera stream, and the page's OWN images -- the card stock,
+     the mode chooser, the medals. That last group used to be fetched the
+     instant a screen was shown, which is why the profile card used to arrive
+     as a blank rectangle that filled in a beat later; the bar never knew
+     about them. Now all four feed one bar and one gate.
+
+     The camera is weighted lightest of the four. Granting permission is the
+     one step that waits on a HUMAN, so letting it drag the number back would
+     park a truthful bar at 75% for as long as the player stares at the
+     browser's prompt.
      ============================================================ */
+  const LOAD_WEIGHT = { game: 0.45, model: 0.3, page: 0.15, cam: 0.1 };
+
   function renderProgress() {
-    const combined = (gameProgress + modelProgress) / 2;
-    const pct = Math.min(99, Math.round(combined * 100));
-    loadTitle.textContent = pct + '%';
+    const camPart = cameraOk || cameraDenied ? 1 : 0;
+    const combined = (gameProgress * LOAD_WEIGHT.game) +
+      (modelProgress * LOAD_WEIGHT.model) +
+      (pageProgress * LOAD_WEIGHT.page) +
+      (camPart * LOAD_WEIGHT.cam);
+    const pct = allReady ? 100 : Math.min(99, Math.round(combined * 100));
+    loadPct.textContent = pct + '%';
     loadBar.style.width = pct + '%';
 
     let detail = 'Preparing…';
@@ -354,6 +731,7 @@
     if (!gameDone && !modelDone) detail = 'Loading assets & blink engine…';
     else if (!gameDone) detail = 'Loading game assets…';
     else if (!modelDone) detail = 'Loading blink engine…';
+    else if (!pageDone) detail = 'Loading artwork…';
     else if (!cameraOk && !cameraDenied) detail = 'Waiting for camera permission…';
     else if (cameraDenied) {
       detail = 'Ready (tap/click to play)';
@@ -364,21 +742,120 @@
     loadWarn.textContent = warn;
   }
 
+  /* The camera is in the gate, but it cannot be allowed to hold it forever:
+   * the permission prompt sits there until the player answers it, and a player
+   * who wanders off mid-prompt would come back to a screen with no button on
+   * it. So it is given a window, after which the load finishes without it and
+   * blink turns itself on later if permission does eventually land. */
+  const CAM_GRACE_MS = 9000;
+
+  function camSettle() {
+    if (camSettled) return;
+    camSettled = true;
+    renderProgress();
+    checkAllReady();
+  }
+
+  setTimeout(() => {
+    if (!cameraOk && !cameraDenied) {
+      console.warn('[Blink] Camera still unanswered after ' + CAM_GRACE_MS + 'ms; starting without it');
+    }
+    camSettle();
+  }, CAM_GRACE_MS);
+
+  /* The page's own images. The engine's loader never sees these -- they are
+   * <img> tags and CSS backgrounds, not sprites -- so they are warmed here and
+   * counted into the same bar. decode() rather than plain onload where it
+   * exists: onload means the bytes arrived, decode() means the pixels are
+   * ready to paint, and the difference is exactly the hitch this is here to
+   * remove. Failures count as done; a missing medal must not strand the gate. */
+  const PAGE_IMAGES = [
+    'background', 'main-bg', 'main-index-title', 'main-index-start',
+    'mode-card', 'mode-blink', 'mode-tap',
+    'profile', 'result', 'leaderboard',
+    'medal-1', 'medal-2', 'medal-3',
+    'avatar1', 'avatar2', 'avatar3', 'avatar4', 'avatar5', 'avatar6'
+  ];
+
+  /* The sign is already in the markup and already swinging, so it cannot be
+   * waited for like the rest -- it has to be faded in where it stands. Its box
+   * is reserved in CSS, so nothing below it moves when it appears. */
+  function revealTitle() {
+    const img = document.querySelector('.landing .title');
+    if (!img) return;
+    const show = () => img.classList.add('ready');
+    if (img.decode) img.decode().then(show, show);
+    else if (img.complete) show();
+    else { img.onload = show; img.onerror = show; }
+  }
+
+  function preloadPageImages() {
+    revealTitle();
+    let done = 0;
+    const step = () => {
+      done += 1;
+      pageProgress = done / PAGE_IMAGES.length;
+      if (done === PAGE_IMAGES.length) pageDone = true;
+      renderProgress();
+      if (pageDone) checkAllReady();
+    };
+    PAGE_IMAGES.forEach((name) => {
+      const img = new Image();
+      img.onerror = step;
+      img.src = './assets/' + name + '.webp';
+      if (img.decode) {
+        img.decode().then(step, step);
+      } else {
+        img.onload = step;
+      }
+    });
+  }
+
   function checkAllReady() {
     if (allReady) return;
-    if (gameDone && modelDone) {
+    if (gameDone && modelDone && pageDone && camSettled) {
       allReady = true;
+      renderProgress();
       finishLoading();
     }
   }
 
+  /* Hand .action-2 over from the bar to the PLAY button. The screen around it
+   * -- backdrop, logo, its swing -- is already up and stays exactly as it is,
+   * so this is the only thing that changes. */
   function finishLoading() {
     canvasEl.classList.remove('hide');
     setTimeout(() => {
-      loadingEl.classList.add('hide');
-      landingEl.classList.remove('hide');
-      landingShownAt = performance.now();
-    }, 1000);
+      /* A replay never sees the title screen. finishLoading only runs once the
+       * game's assets are in and its loop is running, so the run can be started
+       * straight from here. See takeReplay.
+       *
+       * gameStart is set before game.start() because that is the flag onBlink()
+       * reads: until it is true a blink is ignored, so the player cannot drop a
+       * block into a run that has not begun. */
+      if (replay && game) {
+        landingEl.classList.add('hide');
+        gameStart = true;
+        runStarted = true;
+        game.start();
+        // Same as confirmProfile: arm the celebration while the screen is
+        // still settling, so the mark to beat is in hand before the first
+        // landing.
+        partyArm();
+        return;
+      }
+      /* Coming back from the other edition, the player has already pressed
+       * START and already chosen — showing them the title screen again would
+       * make them press START twice for one run. Straight to the card. */
+      if (modePicked) {
+        landingEl.classList.add('hide');
+        gameStart = true;
+        profileShow();
+        return;
+      }
+      loadPanel.classList.add('hide');
+      startBtn.classList.remove('hide');
+    }, 600);
   }
 
   /* ============================================================
@@ -413,17 +890,17 @@
     }
   }
 
-  /** A confirmed blink replaces the tap: start the game or drop the block. */
+  /* A confirmed blink drops the block. That is ALL it does.
+   *
+   * It used to press buttons too — START on the landing screen, GO on the
+   * profile card — which read as helpful but meant a player could not blink
+   * while reading, picking an avatar or reaching for the keyboard without the
+   * screen moving under them. Menus are for clicking; the blink is the tap
+   * replacement, and a tap only ever drops a cake. Anything before the run
+   * starts is deliberately ignored here. */
   function onBlink() {
     if (!blinkReady) return;
-    // On landing screen: blink to start (with 1s grace period so an
-    // accidental blink while the page settles doesn't start early)
-    if (landingEl && !landingEl.classList.contains('hide') && !gameStart && game) {
-      if (performance.now() - landingShownAt > 1000) startGame();
-      return;
-    }
-    // During gameplay: same action as a tap/click
-    if (gameStart && game) {
+    if (runStarted && game) {
       game.touchStartListener();
     }
   }
@@ -496,6 +973,7 @@
     cameraOk = true;
     // Camera permission grant is a user gesture -> unlocks autoplay sound.
     unlockAudio();
+    camSettle();
     console.info('[Blink] Camera ready:', video.videoWidth + 'x' + video.videoHeight);
   }
 
@@ -520,6 +998,7 @@
             console.warn('[Blink] Camera unavailable:', e2);
             updateBlinkReadiness();
             renderProgress();
+            camSettle();
           });
       };
       document.addEventListener('click', retryCam);
@@ -528,6 +1007,7 @@
     }
     updateBlinkReadiness();
     renderProgress();
+    camSettle();
   }
 
   /* ============================================================
@@ -628,6 +1108,7 @@
   /* ============================================================
      GAME SETUP (mirrors original index.html logic)
      ============================================================ */
+  // init window height and width
   let gameWidth = window.innerWidth;
   let gameHeight = window.innerHeight;
   const ratio = 1.5;
@@ -637,6 +1118,38 @@
   document.querySelector('.content').style.height = gameHeight + 'px';
   document.querySelector('.content').style.width = gameWidth + 'px';
   document.querySelector('.js-modal-content').style.width = gameWidth + 'px';
+  document.documentElement.style.setProperty('--gw', gameWidth + 'px');
+
+  /* Take-the-lead celebration. The mark to beat is read once when the run
+   * starts, so passing it fires the party exactly once, mid-run — the player
+   * sees it while they are still stacking, not on the game-over card. */
+  const chase = window.MangoParty ? new window.MangoParty.Chase() : null;
+  let chaseMine = false;
+
+  function partyArm() {
+    if (!chase || !window.MangoBoard) return;
+    chase.arm(null);
+    window.MangoBoard.leader().then((top) => {
+      if (!top) return;
+      // The top score is the mark to beat whether or not the row is already
+      // this player's. Passing your own record is still the best anyone has
+      // done, and the player who holds first place is the one most likely to
+      // beat it — skipping them meant the party almost never fired.
+      chaseMine = !!top.mine;
+      chase.arm(top.score);
+    });
+  }
+
+  function partyCheck(s) {
+    if (!chase || !chase.check(s)) return;
+    window.MangoParty.fire(document.getElementById('canvas'), {
+      title: chaseMine ? 'New best!' : 'You are #1!',
+      note: chaseMine
+        ? 'You just beat your own record — still top of the board'
+        : 'Top of the leaderboard — hold on to it',
+      playAudio: () => game && game.playAudio && game.playAudio('celebrate'),
+    });
+  }
 
   const option = {
     width: gameWidth,
@@ -646,31 +1159,227 @@
     // Blink edition only: slow the left-right block motion to ~60% so aiming
     // by blink is easier. The tap edition (index.html) leaves this unset.
     swingSpeedScale: 0.6,
-    setGameScore: (s) => { score = s; },
-    setGameSuccess: () => {},
+    setGameScore: (s) => { score = s; partyCheck(s); },
+    setGameSuccess: (s) => { successCount = s; },
     setGameFailed: (f) => {
-      document.getElementById('score').textContent = score;
       if (f >= 3) overShowOver();
-    }
+    },
   };
 
-  function overShowOver() {
-    modalEl.classList.remove('hide');
-    document.getElementById('over-modal').classList.remove('hide');
-    document.getElementById('over-zero').classList.remove('hide');
+  // ---- game over summary -------------------------------------------------
+  // assets/result.webp carries every static part of the card, so only the three
+  // numbers and the NEW BEST badge are filled in here. Best score lives in
+  // localStorage next to the profile because Try Again reloads the page.
+  const BEST_KEY = 'mangoMania.best';
+
+  function readBest() {
+    try {
+      return parseInt(localStorage.getItem(BEST_KEY), 10) || 0;
+    } catch (e) {
+      return 0;
+    }
   }
 
-  function indexHide() {
+  function overShowOver() {
+    let best = readBest();
+    const isBest = score > best;
+    if (isBest) {
+      best = score;
+      try { localStorage.setItem(BEST_KEY, best); } catch (e) { /* private mode */ }
+    }
+    document.getElementById('score').textContent = score;
+    document.getElementById('result-height').textContent = successCount || 0;
+    document.getElementById('result-best').textContent = best;
+    document.getElementById('result-newbest').classList.toggle('hide', !isBest);
+    modalEl.classList.remove('hide');
+    document.getElementById('over-modal').classList.remove('hide');
+
+    // Every run is posted, not just personal bests: the server keeps the play
+    // history and works out the board from it. Fire and forget — the card is
+    // already up, and a failed post parks the run in the client's retry queue.
+    if (window.MangoBoard) {
+      window.MangoBoard.submit(readProfile(), score, successCount || 0, 'blink');
+    }
+  }
+
+  function indexHide(done) {
     document.querySelector('.landing .action-1').classList.add('slideTop');
     document.querySelector('.landing .action-2').classList.add('slideBottom');
-    setTimeout(() => { landingEl.classList.add('hide'); }, 950);
+    setTimeout(() => {
+      landingEl.classList.add('hide');
+      // Hand off only once the title and button are actually gone, so the
+      // profile card never shares the screen with the sliding menu.
+      if (done) done();
+    }, 950);
+  }
+
+  /* ---- player profile ---------------------------------------------------
+     Captured once before play and kept in localStorage so the leaderboard has
+     a name and avatar to attach a score to. */
+  const PROFILE_KEY = 'mangoMania.profile';
+  const AVATARS = ['avatar1', 'avatar2', 'avatar3', 'avatar4', 'avatar5', 'avatar6'];
+  let pickedAvatar = AVATARS[0];
+
+  function readProfile() {
+    try {
+      return JSON.parse(localStorage.getItem(PROFILE_KEY)) || null;
+    } catch (e) {
+      // Private mode / disabled storage: play on without a saved profile.
+      return null;
+    }
+  }
+
+  function writeProfile(p) {
+    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) { }
+  }
+
+  window.getPlayerProfile = readProfile;
+
+  /* Replay marker. Try Again still goes through a page load — the game has no
+   * in-place reset — but it leaves this behind so the fresh page knows to drop
+   * the player straight back into a run instead of showing them the title and
+   * the profile card again. Everything the card would have asked for is already
+   * in localStorage, so there is nothing to re-enter.
+   *
+   * sessionStorage rather than a URL flag: its lifetime is this tab, which is
+   * exactly the lifetime of "I just pressed Try Again". Read once and cleared
+   * immediately, so a manual refresh afterwards lands on the title screen like
+   * any other visit. A profile is required — with nothing saved there would be
+   * no name to put on the board, and the card has to be shown after all.
+   *
+   * Read here, at module scope, rather than inside finishLoading: PROFILE_KEY
+   * is a const declared just above, and this is the earliest point it is out of
+   * the temporal dead zone. finishLoading only ever runs from an async callback,
+   * so `replay` is always set by the time it is read.
+   */
+  const REPLAY_KEY = 'mangoMania.replay';
+
+  function takeReplay() {
+    try {
+      if (!sessionStorage.getItem(REPLAY_KEY)) return false;
+      sessionStorage.removeItem(REPLAY_KEY);
+    } catch (e) {
+      return false;
+    }
+    const p = readProfile();
+    return !!(p && p.name);
+  }
+
+  function markReplay() {
+    try { sessionStorage.setItem(REPLAY_KEY, '1'); } catch (e) { }
+  }
+
+  const replay = takeReplay();
+
+  /* ---- control mode -----------------------------------------------------
+   * Tap and blink are two PAGES, not two settings — the blink edition carries
+   * MediaPipe, a worker and a camera, none of which the tap page should pay
+   * for. So choosing is a navigation, and this flag is what survives it: it
+   * says "this load is the second half of a choice already made", which lets
+   * the page skip its own title screen and chooser and open the profile card
+   * directly. Same sessionStorage-once trick as REPLAY_KEY, for the same
+   * reason — a manual refresh afterwards should land on the title screen like
+   * any other visit. */
+  const MODE_KEY = 'mangoMania.mode';
+
+  function takeMode() {
+    try {
+      if (!sessionStorage.getItem(MODE_KEY)) return false;
+      sessionStorage.removeItem(MODE_KEY);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  const modePicked = takeMode();
+
+  function modeShow() {
+    const card = document.querySelector('#mode .card');
+    card.classList.remove('popOut');
+    card.classList.add('popIn');
+    document.getElementById('mode').classList.remove('hide');
+  }
+
+  function modeGo(mode) {
+    if (mode === 'tap') {
+      try { sessionStorage.setItem(MODE_KEY, '1'); } catch (e) { }
+      window.location.href = '/';
+      return;
+    }
+    // Blink is this page: no navigation, just carry on to the profile card.
+    const card = document.querySelector('#mode .card');
+    card.classList.remove('popIn');
+    card.classList.add('popOut');
+    setTimeout(() => {
+      document.getElementById('mode').classList.add('hide');
+      profileShow();
+    }, 300);
+  }
+
+  function selectAvatar(a) {
+    const i = AVATARS.indexOf(a);
+    const idx = i === -1 ? 0 : i;
+    pickedAvatar = AVATARS[idx];
+    document.querySelectorAll('#avatars .avatar').forEach((el, n) => {
+      el.classList.toggle('on', n === idx);
+    });
+  }
+
+  function buildAvatars() {
+    const host = document.getElementById('avatars');
+    host.innerHTML = AVATARS
+      .map((a, n) => `<div class="avatar" data-avatar="${a}"><img src="./assets/${a}.webp" alt="Avatar ${n + 1}" decoding="async"></div>`)
+      .join('');
+    host.querySelectorAll('.avatar').forEach(el => {
+      el.addEventListener('click', () => selectAvatar(el.getAttribute('data-avatar')));
+    });
+  }
+
+  function profileShow() {
+    const saved = readProfile();
+    buildAvatars();
+    selectAvatar(saved ? saved.avatar : AVATARS[0]);
+    if (saved && saved.name) document.getElementById('player-name').value = saved.name;
+    if (saved && saved.company) document.getElementById('player-company').value = saved.company;
+    const card = document.querySelector('#profile .card');
+    card.classList.remove('popOut');
+    card.classList.add('popIn');
+    document.getElementById('profile').classList.remove('hide');
+  }
+
+  function confirmProfile() {
+    const input = document.getElementById('player-name');
+    const name = (input.value || '').trim();
+    if (!name) {
+      // Nudge rather than block silently: the leaderboard needs a name.
+      input.classList.remove('shake');
+      void input.offsetWidth;
+      input.classList.add('shake');
+      input.focus();
+      return;
+    }
+    const companyEl = document.getElementById('player-company');
+    const company = (companyEl.value || '').trim();
+    writeProfile({
+      name, company, avatar: pickedAvatar, updatedAt: Date.now()
+    });
+    input.blur();
+    companyEl.blur();
+    const card = document.querySelector('#profile .card');
+    card.classList.remove('popIn');
+    card.classList.add('popOut');
+    setTimeout(() => { document.getElementById('profile').classList.add('hide'); }, 300);
+    setTimeout(() => { runStarted = true; game.start(); }, 400);
+    // Read the mark to beat now, while the card is sliding out, so it is in
+    // hand before the first block lands.
+    partyArm();
   }
 
   function startGame() {
     if (gameStart) return;
     gameStart = true;
-    indexHide();
-    setTimeout(() => game.start(), 400);
+    indexHide(modeShow);
   }
 
   function startBgm() {
@@ -720,22 +1429,140 @@
   /* ============================================================
      UI EVENTS (click/touch still work as fallback)
      ============================================================ */
+
+  /* Every button ticks. Delegated from the document rather than bound handler
+   * by handler: the result and leaderboard buttons are in markup that gets shown
+   * and hidden, the avatars are rebuilt from scratch each time the card opens,
+   * and a per-handler call would be one more line to forget on the next button.
+   * Capture phase so the tick starts even if the handler navigates away.
+   *
+   * `game` is checked because #start is clickable while the engine is still
+   * loading, and playClick is only hung on it once the audio is registered. */
+  const CLICKABLE = '#start,#profile-go,.avatar,.rs-btn,.mode-pick';
+  document.addEventListener('click', (e) => {
+    if (!game || !game.playClick) return;
+    const el = e.target;
+    if (!el || !el.closest || !el.closest(CLICKABLE)) return;
+    game.playClick();
+  }, true);
+
   startBtn.addEventListener('click', () => {
     if (gameStart) return;
     startGame();
   });
 
-  document.querySelector('.js-reload').addEventListener('click', () => {
-    window.location.href = window.location.href.split('?')[0] + '?s=' + (+new Date());
+  document.querySelectorAll('.mode-pick').forEach((el) => el.addEventListener('click', () => {
+    modeGo(el.getAttribute('data-mode'));
+  }));
+
+  document.getElementById('profile-go').addEventListener('click', confirmProfile);
+  ['player-name', 'player-company'].forEach((id) => {
+    document.getElementById(id).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') confirmProfile();
+    });
   });
 
-  document.querySelector('.js-invite').addEventListener('click', () => {
-    document.querySelector('.wxShare').classList.remove('hide');
+  // Neither button can restart in place — the game has no reset — so both go
+  // through a page load. What separates them is where that load lands: Try
+  // Again marks the reload as a replay and comes back straight into a run as
+  // the same player, while Home leaves the mark unset and gets the title screen.
+  document.querySelectorAll('.js-reload').forEach((el) => el.addEventListener('click', () => {
+    markReplay();
+    window.location.href = window.location.pathname + '?s=' + (+new Date());
+  }));
+
+  document.querySelectorAll('.js-home').forEach((el) => el.addEventListener('click', () => {
+    window.location.href = window.location.pathname;
+  }));
+
+  // ---- leaderboard -------------------------------------------------------
+  // Global: the board comes from /api/leaderboard, which returns one row per
+  // player worldwide with the caller's own row already flagged.
+  //
+  // Real scores only — there is no house table to pad the board out. An empty
+  // database shows an empty board, because a player who beats a name that was
+  // never a person has not actually beaten anyone.
+
+  // The name comes out of a free-text field, so it cannot go into innerHTML raw.
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'
+    }[c]));
+  }
+
+  // Rows are built exactly the same way for both the live board and the local
+  // fallback: the row builder only cares about name/company/avatar/score/me.
+  const lbRows = (entries) => entries.map((e, i) => (
+    `<div class="lb-row${e.me ? ' me' : (i === 0 ? ' gold' : '')}"`
+    + ` data-key="${esc(e.key || ('n' + i))}">`
+    + (i < 3
+      ? `<img class="lb-medal" src="./assets/medal-${i + 1}.webp" alt="${i + 1}" decoding="async">`
+      : `<span class="lb-rank ${e.me ? 'mine' : ''}">${i + 1}</span>`)
+    + `<img class="lb-face" src="./assets/${e.avatar}.webp" alt="" decoding="async">`
+    + `<span class="lb-name"><b>${esc(e.name)}</b>`
+      + `${e.company ? `<i>${esc(e.company)}</i>` : ''}</span>`
+    // Outside .lb-name on purpose: in the top three a medal replaces the rank
+    // pill, so the pill's "mine" colour is gone exactly where it matters most.
+    // As a sibling the badge marks the row at every position.
+    + (e.me ? '<span class="lb-you">You</span>' : '')
+    + `<span class="lb-score">${e.score}</span>`
+    + '</div>'
+  )).join('');
+
+  // Shown in place of rows when there is nothing to rank, or nothing to reach.
+  const lbEmpty = (title, note) =>
+    `<div class="lb-empty"><b>${esc(title)}</b>${note ? esc(note) : ''}</div>`;
+
+  // Opens on the standings this device saw last, then moves the rows to the
+  // current ones. Showing the shuffle is the point: the player watches
+  // themselves climb past whoever they passed, the way a console board does.
+  function boardRender() {
+    const list = document.getElementById('lb-list');
+    const seen = window.MangoBoard && window.MangoBoard.snapshot();
+    list.innerHTML = seen ? lbRows(seen) : lbEmpty('Loading the board…');
+
+    if (!window.MangoBoard) return;
+    // Paced on purpose: the old standings hold for a beat so the player reads
+    // them, and only then do the rows move to the new ones.
+    window.MangoBoard.paced(window.MangoBoard.top(20)).then((res) => {
+      const rows = res && res.leaderboard ? res.leaderboard : null;
+      if (!rows) {
+        // Server unreachable and nothing cached: say so rather than sit blank.
+        if (!seen) {
+          list.innerHTML = lbEmpty('Board unavailable',
+            'Check your connection and try again.');
+        }
+        return;
+      }
+      if (!rows.length) {
+        list.innerHTML = lbEmpty('No scores yet',
+          'Play a round and you will be first on the board.');
+        window.MangoBoard.remember([]);
+        return;
+      }
+
+      let was = {};
+      const climbers = {};
+      if (seen) {
+        const oldSeat = {};
+        seen.forEach((r, i) => { oldSeat[r.key] = i; });
+        was = window.MangoBoard.positions(list);
+        rows.forEach((r, i) => {
+          if (oldSeat[r.key] != null && i < oldSeat[r.key]) climbers[r.key] = true;
+        });
+      }
+      list.innerHTML = lbRows(rows);
+      window.MangoBoard.slide(list, was, climbers);
+      window.MangoBoard.remember(rows);
+    });
+  }
+
+  document.querySelector('.js-leaderboard').addEventListener('click', () => {
+    boardRender();
+    document.getElementById('over-modal').classList.add('hide');
+    document.getElementById('board-modal').classList.remove('hide');
   });
 
-  document.querySelector('.wxShare').addEventListener('click', () => {
-    document.querySelector('.wxShare').classList.add('hide');
-  });
 
   /* ============================================================
      INIT — everything happens during the loading screen
@@ -753,6 +1580,7 @@
 
     setupCamera();
     initGame();
+    preloadPageImages();
 
     await modelPromise;
 
