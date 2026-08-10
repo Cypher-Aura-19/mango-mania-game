@@ -1,8 +1,7 @@
 import { Engine, Instance } from 'cooljs'
-import { touchEventHandler } from './utils'
+import { touchEventHandler, playSfx } from './utils'
 import { background } from './background'
 import { lineAction, linePainter } from './line'
-import { cloudAction, cloudPainter } from './cloud'
 import { hookAction, hookPainter } from './hook'
 import { tutorialAction, tutorialPainter } from './tutorial'
 import { addBalloon } from './balloon'
@@ -28,57 +27,169 @@ window.TowerGame = (option = {}) => {
   game.addImg('background', pathGenerator('background.webp'))
   game.addImg('gamebg', pathGenerator('game-bg-1.webp'))
   game.addImg('gamebg2', pathGenerator('game-bg-2.webp'))
-  game.addImg('hook', pathGenerator('hook.png'))
-  game.addImg('blockRope', pathGenerator('block-rope.png'))
-  game.addImg('block', pathGenerator('block.png'))
-  game.addImg('block-perfect', pathGenerator('block-perfect.png'))
-  game.addImg('balloon', pathGenerator('balloon.png'))
-  for (let i = 1; i <= 8; i += 1) {
-    game.addImg(`c${i}`, pathGenerator(`c${i}.png`))
+  game.addImg('gamebg3', pathGenerator('game-bg-3.webp'))
+  /* A wide screen shows the canvas as a centre column with the page's own
+   * backdrop filling the bands either side. The landscape cut of each layer is
+   * what lets the two add up to one picture instead of three: the column paints
+   * its slice of a window-wide fill and the page paints the rest. Registered
+   * only when it will be used, so a phone never downloads them. */
+  if (option.wideBackdrop) {
+    game.addImg('backgroundWide', pathGenerator('laptop-background.webp'))
+    game.addImg('gamebgWide', pathGenerator('laptop-game-bg-1.webp'))
+    game.addImg('gamebg2Wide', pathGenerator('laptop-game-bg-2.webp'))
+    game.addImg('gamebg3Wide', pathGenerator('laptop-game-bg-3.webp'))
+  }
+  game.addImg('hook', pathGenerator('hook.webp'))
+  game.addImg('blockRope', pathGenerator('block-rope.webp'))
+  game.addImg('block', pathGenerator('block.webp'))
+  game.addImg('block-perfect', pathGenerator('block-perfect.webp'))
+  game.addImg('balloon', pathGenerator('balloon.webp'))
+  /* Sky decor. c1..c3 were the plain white clouds and are no longer used, so
+   * only the mango-space props are registered. They are painted straight into
+   * the backdrop tiles now rather than drifting as sprites — see the decor
+   * table in background.js. */
+  for (let i = 4; i <= 8; i += 1) {
+    game.addImg(`c${i}`, pathGenerator(`c${i}.webp`))
   }
   game.addLayer(constant.flightLayer)
-  for (let i = 1; i <= 7; i += 1) {
-    game.addImg(`f${i}`, pathGenerator(`f${i}.png`))
-  }
+  /* Only the flypast art the schedule actually asks for. f2/f3 were a pair of
+   * red-and-cream hot-air balloons from the original artwork — off-theme next to
+   * the mango balloon that already drifts past, and dropped. f5 is a byte-for-byte
+   * copy of the f4 plane, so the second plane pass reuses f4 rather than paying
+   * for the same 1.4MB download twice. Both files are still in assets/. */
+  const flightImgs = ['f1', 'f4', 'f6', 'f7']
+  flightImgs.forEach((name) => {
+    game.addImg(name, pathGenerator(`${name}.webp`))
+  })
   game.swapLayer(0, 1)
-  game.addImg('tutorial', pathGenerator('tutorial.png'))
-  game.addImg('tutorial-arrow', pathGenerator('tutorial-arrow.png'))
-  game.addImg('heart', pathGenerator('heart.png'))
-  game.addImg('score', pathGenerator('score.png'))
+  /* Layers now paint in the order [flight, default, balloon]: birds behind the
+   * tower, blocks next, balloon last. Added AFTER the swap on purpose — swap
+   * indices 0 and 1 are the only two layers that exist at that point, and
+   * appending afterwards is what puts the balloon on top. */
+  game.addLayer(constant.balloonLayer)
+  game.addImg('tutorial', pathGenerator('tutorial.webp'))
+  game.addImg('tutorial-arrow', pathGenerator('tutorial-arrow.webp'))
+  game.addImg('mango', pathGenerator('mango.webp'))
+  // HUD plaques carry their own SCORE / FLOOR label; only the numbers are
+  // drawn live. Regenerate with tools/make-hud-plaques.py.
+  game.addImg('hudScore', pathGenerator('hud-score.webp'))
+  game.addImg('hudFloor', pathGenerator('hud-floor.webp'))
+  game.addImg('hudLives', pathGenerator('hud-lives.webp'))
+  // Satisfaction meter: an empty wooden gauge, the juice column that fills it,
+  // and one reaction face per level in a lit and a greyed-out version.
+  // Regenerate with tools/make-satisfaction-meter.py.
+  game.addImg('meterTrack', pathGenerator('meter-track.webp'))
+  game.addImg('meterFill', pathGenerator('meter-fill.webp'))
+  for (let i = 1; i <= 3; i += 1) {
+    game.addImg(`reaction${i}`, pathGenerator(`reaction-${i}.webp`))
+    game.addImg(`reaction${i}Off`, pathGenerator(`reaction-${i}-off.webp`))
+  }
   // Mango cream sprinkle variants: blob, teardrop, capsule sprinkle, dot.
   for (let i = 1; i <= 4; i += 1) {
-    game.addImg(`cream${i}`, pathGenerator(`cream-${i}.png`))
+    game.addImg(`cream${i}`, pathGenerator(`cream-${i}.webp`))
   }
   game.addAudio('drop-perfect', pathGenerator('drop-perfect.mp3'))
   game.addAudio('drop', pathGenerator('drop.mp3'))
   game.addAudio('game-over', pathGenerator('game-over.mp3'))
   game.addAudio('rotate', pathGenerator('rotate.mp3'))
   game.addAudio('bgm', pathGenerator('bgm.mp3'))
-  game.setVariable(constant.blockWidth, game.width * 0.39)
+  /* One voice per flypast, played as the sprite enters — see the schedule in
+   * animateFuncs.js. `celebrate` is the take-the-lead party, fired by the page
+   * (celebrate.js) rather than by the engine. `clip` is the shear as an
+   * overhang breaks off, and `drip` a single bead of cream leaving the seam. */
+  game.addAudio('flight-plane', pathGenerator('flight-plane.mp3'))
+  game.addAudio('flight-rocket', pathGenerator('flight-rocket.mp3'))
+  game.addAudio('flight-birds', pathGenerator('flight-birds.mp3'))
+  game.addAudio('flight-comet', pathGenerator('flight-comet.mp3'))
+  game.addAudio('celebrate', pathGenerator('celebrate.mp3'))
+  game.addAudio('clip', pathGenerator('clip.mp3'))
+  game.addAudio('drip', pathGenerator('drip.mp3'))
+  /* Every button in the page ticks. Registered here rather than as a bare
+   * <audio> on the page so it goes through the same mute switch and the same
+   * preload as the rest — a UI sound that keeps playing after the player has
+   * turned the sound off is the sort of thing people notice. */
+  game.addAudio('click', pathGenerator('click.mp3'))
+  /* The cake block's own three sounds, in the order the player hears them: the
+   * rope creaking as the block swings, the air as it drops, the thud as it
+   * lands. `land` is the physical impact only — drop / drop-perfect above stay
+   * the scoring chime, and the two layer because the thud is all low end and
+   * the chime has none. See tools/make-cake-sfx.js. */
+  game.addAudio('swing', pathGenerator('swing.mp3'))
+  game.addAudio('fall', pathGenerator('fall.mp3'))
+  game.addAudio('land', pathGenerator('land.mp3'))
+  /* The customer's verdict — one wordless reaction per face on the satisfaction
+   * gauge, played when the lit face changes. See tools/make-customer-sfx.js. */
+  game.addAudio('react-happy', pathGenerator('react-happy.mp3'))
+  game.addAudio('react-ok', pathGenerator('react-ok.mp3'))
+  game.addAudio('react-angry', pathGenerator('react-angry.mp3'))
+  /* The engine has no mixer, so levels are set on the elements themselves.
+   * These sit on top of a bed of music and the drop sounds, and element volume
+   * only ever scales DOWN — so the clips themselves are normalised to a common
+   * peak (tools do this offline) and the trims below are balance, not rescue.
+   * addAudio stores the element synchronously, so it is there to be adjusted.
+   *
+   * The drip and the rope creak are held well back. Both recur on their own
+   * clock for the whole run — a bead falls off every landed layer every second
+   * or so, and the rope creaks twice per swing — so both have to read as texture
+   * rather than as events. Everything else is a one-off. */
+  const levels = {
+    'flight-plane': 0.85,
+    'flight-rocket': 0.8,
+    'flight-birds': 0.85,
+    'flight-comet': 0.8,
+    celebrate: 0.9,
+    clip: 0.7,
+    drip: 0.3,
+    // Held back for the same reason as the drip: it fires on every tap, and a
+    // confirmation tick that competes with the music is a tick you get sick of.
+    click: 0.45,
+    // Constant, so quiet enough to notice only when it stops.
+    swing: 0.22,
+    // Under the tap that caused it, and ducking out of the way of the thud.
+    fall: 0.5,
+    // The thud sits UNDER drop/drop-perfect rather than beside them; at parity
+    // the two attacks fight and the landing reads as a rattle.
+    land: 0.6,
+    /* The reactions carry the mechanic the meter exists for, so they are the
+     * loudest thing here — but they only fire when the lit face changes, which
+     * is a handful of times a run. */
+    'react-happy': 0.85,
+    'react-ok': 0.7,
+    'react-angry': 0.85
+  }
+  Object.keys(levels).forEach((name) => {
+    const audio = game.getAudio(name)
+    if (audio) audio.volume = levels[name]
+  })
+  /* The canvas is as wide as the window; the tower is stacked in a centred
+   * portrait column of it. The page passes the column width in CSS pixels —
+   * fall back to the whole canvas so a portrait screen, where the two are the
+   * same thing, needs no special case. */
+  const playWidth = option.playWidth
+    ? option.playWidth * (game.highResolution ? 2 : 1)
+    : game.width
+  game.setVariable(constant.playWidth, playWidth)
+  game.setVariable(constant.playLeft, Math.round((game.width - playWidth) / 2))
+
+  game.setVariable(constant.blockWidth, playWidth * 0.39)
   // Height as a fraction of width. Lower = flatter, more normal-looking cake
   // layer; the tall 0.71 slab read as too chunky next to its own width.
   game.setVariable(constant.blockHeight, game.getVariable(constant.blockWidth) * 0.56)
   game.setVariable(constant.currentWidth, game.getVariable(constant.blockWidth))
   game.setVariable(constant.currentHeight, game.getVariable(constant.blockHeight))
-  game.setVariable(constant.cloudSize, game.width * 0.3)
+  // Sized off the column so a space prop or a bird stays the size it is on a
+  // phone; they are still PLACED across the whole canvas, which is what gives a
+  // laptop a wider view of the same sky rather than bigger scenery.
+  game.setVariable(constant.cloudSize, playWidth * 0.3)
   game.setVariable(constant.ropeHeight, game.height * 0.34)
-  game.setVariable(constant.lineInitialOffset, game.height * 0.653)
+  game.setVariable(constant.lineInitialOffset, game.height * 0.671)
   game.setVariable(constant.blockCount, 0)
   game.setVariable(constant.successCount, 0)
   game.setVariable(constant.failedCount, 0)
   game.setVariable(constant.gameScore, 0)
+  game.setVariable(constant.satisfaction, constant.satisfactionStart)
   game.setVariable(constant.hardMode, false)
   game.setVariable(constant.gameUserOption, option)
-  for (let i = 1; i <= 2; i += 1) {
-    const cloud = new Instance({
-      name: `cloud_${i}`,
-      action: cloudAction,
-      painter: cloudPainter
-    })
-    cloud.index = i
-    cloud.count = 5 - i
-    game.addInstance(cloud)
-  }
   const line = new Instance({
     name: 'line',
     action: lineAction,
@@ -110,6 +221,14 @@ window.TowerGame = (option = {}) => {
 
   game.pauseBgm = () => {
     game.pauseAudio('bgm')
+  }
+
+  /* The page's buttons live in the DOM, not in the engine, so they get a hook
+   * rather than reaching into the audio map themselves. playSfx and not
+   * playAudio: two taps in quick succession are normal on a menu, and play()
+   * on an element that is already playing does nothing at all. */
+  game.playClick = () => {
+    playSfx(game, 'click')
   }
 
   game.start = () => {

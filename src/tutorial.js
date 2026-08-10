@@ -1,15 +1,17 @@
-import { getHookStatus } from './utils'
+import { getHookStatus, pw, px } from './utils'
 import * as constant from './constant'
 
 export const tutorialAction = (instance, engine, time) => {
-  const { width, height } = engine
+  const { height } = engine
   const { name } = instance
   if (!instance.ready) {
     instance.ready = true
-    const tutorialWidth = width * 0.2
+    const tutorialWidth = pw(engine) * 0.2
     instance.updateWidth(tutorialWidth)
     instance.height = tutorialWidth * 0.46
-    instance.x = engine.calWidth - instance.calWidth
+    // Centred on the stacking column — the hand points at the block, which
+    // hangs over the column, not over the middle of a wide canvas.
+    instance.x = px(engine, 0.5) - instance.calWidth
     instance.y = height * 0.45
     if (name !== 'tutorial') {
       instance.y += instance.height * 1.2

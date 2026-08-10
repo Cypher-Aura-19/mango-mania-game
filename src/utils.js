@@ -1,7 +1,42 @@
 import * as constant from './constant'
 
+/* The stacking column: the centred portrait box the tower is built in. On a
+ * portrait screen it is the whole canvas; on a laptop the canvas is wider and
+ * the column sits in the middle of it, so gameplay is identical on both and
+ * only the scenery gets the extra width. See constant.playWidth.
+ *
+ * pw()/pl() are the two halves — width and left edge — and px(f) turns a
+ * fraction of the column into a canvas x. Anything the player aims with should
+ * be sized with pw() and placed with px(); anything that is scenery keeps using
+ * engine.width. */
+export const pw = engine => engine.getVariable(constant.playWidth) || engine.width
+export const pl = engine => engine.getVariable(constant.playLeft) || 0
+export const px = (engine, fraction) => pl(engine) + (pw(engine) * fraction)
+
 export const checkMoveDown = engine =>
   (engine.checkTimeMovement(constant.moveDownMovement))
+
+/* The run is over and the scene is frozen.
+ *
+ * Read by every action and by the backdrop scroll. The engine's own `paused`
+ * flag stops the loop a frame later (see freezeGame), but the frame in which
+ * the third life is lost is still mid-flight when this gets set, and without
+ * these guards that frame would scroll the sky and tip the tower one last time
+ * before stopping. */
+export const isGameOver = engine => !!engine.getVariable(constant.gameOver)
+
+/* Stop the animation loop, leaving the last painted frame on the canvas.
+ *
+ * cooljs bails out of animate() before clean() when `paused` is set, so nothing
+ * repaints and nothing clears: the tower, the hanging block, the backdrop and
+ * the HUD all stay exactly as they were. Called at the very END of the frame
+ * (from endAnimate) so that frame is complete before the loop stops — freezing
+ * any earlier would leave the HUD or the sprites missing from the final image.
+ *
+ * Never unpaused. Both buttons on the summary card restart with a page load. */
+export const freezeGame = (engine) => {
+  if (isGameOver(engine) && !engine.paused) engine.paused = true
+}
 
 // A block keeps its cake proportions: as clipping shaves the width down, the
 // layer gets shorter too instead of stretching into a long thin slab. Applies
@@ -10,7 +45,11 @@ export const getBlockHeightForWidth = (engine, width) => {
   const fullWidth = engine.getVariable(constant.blockWidth)
   const fullHeight = engine.getVariable(constant.blockHeight)
   if (!fullWidth) return fullHeight
-  const ratio = Math.max(constant.minHeightRatio, Math.min(1, width / fullWidth))
+  const widthRatio = Math.max(constant.minHeightRatio, Math.min(1, width / fullWidth))
+  // Shrink by only HALF of what the width lost. Matching the width 1:1 made
+  // clipped layers collapse into slivers; this keeps the cake proportions
+  // reading right while leaving the layer thick enough to see and land on.
+  const ratio = 1 - ((1 - widthRatio) * constant.heightSqueezeFactor)
   return fullHeight * ratio
 }
 
@@ -127,6 +166,7 @@ export const getHookStatus = (engine) => {
 
 export const touchEventHandler = (engine) => {
   if (!engine.getVariable(constant.gameStartNow)) return
+  if (isGameOver(engine)) return
   if (engine.debug && engine.paused) {
     return
   }
@@ -140,6 +180,92 @@ export const touchEventHandler = (engine) => {
     engine.setTimeMovement(constant.hookUpMovement, 500)
     b.status = constant.beforeDrop
   }
+}
+
+// How pleased the customer is with a landing, as a satisfaction change.
+// `keepRatio` is how much of the layer survived the drop. Linear on each side
+// of the good-keep line, with a small step at the line itself so a landing that
+// is exactly good enough still counts for something.
+export const getSatisfactionDelta = (keepRatio) => {
+  const good = constant.satisfactionGoodKeep
+  if (keepRatio >= good) {
+    return 2 + (8 * ((keepRatio - good) / (1 - good)))
+  }
+  return -(2 + (18 * ((good - keepRatio) / good)))
+}
+
+/* Which reaction face a satisfaction value lights: the highest level whose `at`
+ * it has reached. The gauge paints from this and the reaction sounds fire from
+ * it, and they have to agree — a grunt with a smiling face still lit is worse
+ * than no grunt at all — so both read this one function.
+ */
+export const getReactionLevel = (value) => {
+  const levels = constant.satisfactionLevels
+  let lit = 0
+  for (let i = 0; i < levels.length; i += 1) {
+    if (value >= levels[i].at) lit = i
+  }
+  return lit
+}
+
+// Indexed by reaction level, so this array is in the same order as the faces on
+// the gauge: bottom (angry) to top (delighted).
+const reactionSounds = ['react-angry', 'react-ok', 'react-happy']
+
+// Move the meter and pay out the swing. The customer tipping better for a tidy
+// cake, and docking you for a mangled one, is the whole point of the mechanic.
+export const addSatisfaction = (engine, delta) => {
+  const { setGameScore, setGameSatisfaction } = engine.getVariable(constant.gameUserOption)
+  const before = engine.getVariable(constant.satisfaction, constant.satisfactionStart)
+  const after = Math.max(0, Math.min(100, before + delta))
+  engine.setVariable(constant.satisfaction, after)
+  /* Voice the customer only when the LIT FACE CHANGES, not on every landing.
+   * Every drop moves the meter, so a reaction per drop would be a running
+   * commentary; a reaction per mood change is a handful of times a run, and it
+   * means the sound always tells the player something the number alone did not.
+   *
+   * The face is read off `after` rather than off satisfactionShown, so the voice
+   * arrives with the event that caused it — the column is still sliding up to
+   * meet it, which is the right way round. */
+  const litBefore = getReactionLevel(before)
+  const litAfter = getReactionLevel(after)
+  if (litAfter !== litBefore) {
+    playSfx(engine, reactionSounds[litAfter])
+  }
+  // Pay for the movement that actually happened, not the movement asked for.
+  // Once the meter is pinned at 100 there is no more goodwill left to earn, so
+  // a run of flawless drops stops printing free points.
+  //
+  // Upward movement only: the score is a record of what the player built, so a
+  // clipped or dropped layer costs them the meter and the tower, never points
+  // already banked. The meter still falls — it is the thing that carries the
+  // customer's mood, and it gates the tip on later layers.
+  const moved = after - before
+  if (moved > 0) {
+    const score = Math.max(0, engine.getVariable(constant.gameScore, 0)
+      + Math.round(moved * constant.satisfactionScoreRate))
+    engine.setVariable(constant.gameScore, score)
+    if (setGameScore) setGameScore(score)
+  }
+  if (setGameSatisfaction) setGameSatisfaction(after)
+}
+
+/* Plays a short effect that may fire again before it has finished.
+ *
+ * engine.playAudio calls play() on one shared element per name, and play() on an
+ * element that is already playing does nothing — so a second shear inside the
+ * length of the first is silent. Rewinding first makes it audible again. The
+ * seek is guarded: currentTime throws while the clip is still unreadable, which
+ * is exactly when the sound does not matter anyway.
+ */
+export const playSfx = (engine, name) => {
+  if (!engine.soundOn) return
+  const audio = engine.getAudio(name)
+  if (!audio) return
+  try {
+    if (audio.currentTime > 0) audio.currentTime = 0
+  } catch (e) { /* not seekable yet */ }
+  engine.playAudio(name)
 }
 
 export const addSuccessCount = (engine) => {
@@ -159,11 +285,18 @@ export const addFailedCount = (engine) => {
   const failed = lastFailedCount + 1
   engine.setVariable(constant.failedCount, failed)
   engine.setVariable(constant.perfectCount, 0)
+  // A layer on the floor is the worst thing the customer can watch happen.
+  addSatisfaction(engine, -25)
   if (setGameFailed) setGameFailed(failed)
   if (failed >= 3) {
     engine.pauseAudio('bgm')
     engine.playAudio('game-over')
-    engine.setVariable(constant.gameStartNow, false)
+    /* Freeze, don't reset. This used to clear gameStartNow, which is the MENU
+     * flag — so the backdrop flipped to the title art and the HUD vanished
+     * while the tower carried on wobbling underneath. Marking the run over
+     * instead keeps the scene exactly as the player left it and stops the
+     * motion, which is what "game over" should look like. */
+    engine.setVariable(constant.gameOver, true)
   }
 }
 
@@ -180,7 +313,7 @@ export const addScore = (engine, isPerfect) => {
 
 export const drawYellowString = (engine, option) => {
   const {
-    string, size, x, y, textAlign, fontName = 'wenxue', fontWeight = 'normal'
+    string, size, x, y, textAlign, fontName = 'Audex', fontWeight = 'normal'
   } = option
   const { ctx } = engine
   const fontSize = size
@@ -199,3 +332,41 @@ export const drawYellowString = (engine, option) => {
   ctx.fillText(string, x, y)
   ctx.restore()
 }
+
+// Number painted into a HUD plaque's cream panel. The plaque PNG already
+// carries its SCORE / FLOOR label; this only draws the live value, fitted to
+// `box` so a five-figure score cannot run under the frame. The pale copy
+// underneath is the same emboss the baked label uses.
+export const drawBoardString = (engine, option) => {
+  const {
+    string, box, color = '#4A3012', fontName = 'Audex', fontWeight = 'bold'
+  } = option
+  const { ctx } = engine
+  const text = String(string)
+  ctx.save()
+  // Measure once at a reference size and scale from it, rather than looping:
+  // both the advance width and the ink height are linear in font size.
+  const probe = 100
+  ctx.font = `${fontWeight} ${probe}px ${fontName}`
+  const m = ctx.measureText(text)
+  const unitWidth = m.width / probe
+  // Fit the INK, not the em box — digits have no descender, so sizing by the em
+  // box would leave the number floating small in the middle of the panel.
+  const ink = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent
+  const unitHeight = (ink > 0 ? ink : probe * 0.72) / probe
+  const size = Math.min(box.h / unitHeight, unitWidth > 0 ? box.w / unitWidth : box.h)
+  ctx.font = `${fontWeight} ${size}px ${fontName}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  const fit = ctx.measureText(text)
+  const asc = fit.actualBoundingBoxAscent
+  const desc = fit.actualBoundingBoxDescent
+  const x = box.x + (box.w / 2)
+  const y = box.y + (box.h / 2) + (asc > 0 ? (asc - desc) / 2 : size * 0.36)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)'
+  ctx.fillText(text, x, y + (size * 0.045))
+  ctx.fillStyle = color
+  ctx.fillText(text, x, y)
+  ctx.restore()
+}
+
