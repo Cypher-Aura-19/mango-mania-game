@@ -64,7 +64,23 @@ function guard(req, res, next) {
   return res.status(401).json({ error: 'admin token required' });
 }
 
-router.post('/score', (req, res) => {
+/* Every query is a promise now that the store is over the network, and Express 4
+ * does not know what to do with one: a handler that rejects is an unhandled
+ * rejection, which leaves the request hanging until the client times out and
+ * takes the whole process down on modern Node. So the read routes go through
+ * here — the rejection becomes a 503, the same answer the write already gives,
+ * and the reason lands in the log rather than in the player's face. */
+function wrap(handler) {
+  return (req, res, next) => {
+    Promise.resolve(handler(req, res, next)).catch((err) => {
+      console.error('[api] ' + req.method + ' ' + req.originalUrl + ' failed:',
+        err && err.message);
+      if (!res.headersSent) res.status(503).json({ error: 'leaderboard unavailable' });
+    });
+  };
+}
+
+router.post('/score', async (req, res) => {
   const b = req.body || {};
   const deviceId = text(b.deviceId, 64);
   const name = text(b.name, 40);
@@ -86,10 +102,11 @@ router.post('/score', (req, res) => {
   const layers = Number.isInteger(Number(b.layers))
     ? Math.max(0, Math.min(MAX_SCORE, Number(b.layers))) : 0;
 
-  // A write that loses the lock race past its retries is retryable, not the
-  // client's fault: 503 tells the client to requeue instead of dropping the run.
+  // A write that fails against the hosted store — a dropped connection, a
+  // transaction the server rolled back — is retryable, not the client's fault:
+  // 503 tells the client to requeue instead of dropping the run.
   try {
-    const out = recordScore({
+    const out = await recordScore({
       deviceId,
       name,
       company: text(b.company, 40),
@@ -110,13 +127,13 @@ router.post('/score', (req, res) => {
  * both light up. Identity is device+name+company, so all three are needed; a
  * bare ?me= from an older client simply matches nothing and no row is marked.
  * The internal player id is resolved here and dropped from the response. */
-router.get('/leaderboard', (req, res) => {
+router.get('/leaderboard', wrap(async (req, res) => {
   const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 20));
   const mine = req.query.me
-    ? q.findPlayer.get(String(req.query.me), text(req.query.meName, 40),
+    ? await q.findPlayer(String(req.query.me), text(req.query.meName, 40),
       text(req.query.meCompany, 40))
     : null;
-  const rows = q.board.all(limit).map((r, i) => ({
+  const rows = (await q.board(limit)).map((r, i) => ({
     rank: i + 1,
     // Stable across reorders, so the client can animate a row from its old
     // rank to its new one. The internal id never leaves as anything else.
@@ -130,31 +147,31 @@ router.get('/leaderboard', (req, res) => {
     played_at: r.played_at,
     me: !!mine && r.pid === mine.id,
   }));
-  res.json({ leaderboard: rows, ...q.totals.get() });
-});
+  res.json({ leaderboard: rows, ...await q.totals() });
+}));
 
 /* The player's own standing, for the row the board highlights: their best and
  * where it sits even when that is far below the visible top slice. Name and
  * company come as query params because they are part of the identity. */
-router.get('/me/:deviceId', (req, res) => {
-  const found = q.findPlayer.get(req.params.deviceId,
+router.get('/me/:deviceId', wrap(async (req, res) => {
+  const found = await q.findPlayer(req.params.deviceId,
     text(req.query.name, 40), text(req.query.company, 40));
   if (!found) return res.json({ best: 0, rank: null, plays: 0 });
-  const best = q.best.get(found.id).best;
-  res.json({ best, rank: q.rank.get(best).rank });
-});
+  const best = (await q.best(found.id)).best;
+  res.json({ best, rank: (await q.rank(best)).rank });
+}));
 
-router.get('/export/leaderboard.csv', guard, (req, res) => {
-  const rows = q.boardAll.all().map((r, i) => ({ rank: i + 1, ...r }));
+router.get('/export/leaderboard.csv', guard, wrap(async (req, res) => {
+  const rows = (await q.boardAll()).map((r, i) => ({ rank: i + 1, ...r }));
   csv.send(res, csv.stamped('mango-mania-leaderboard'),
     csv.toCsv(csv.LEADERBOARD_COLUMNS, rows));
-});
+}));
 
-router.get('/export/scores.csv', guard, (req, res) => {
+router.get('/export/scores.csv', guard, wrap(async (req, res) => {
   csv.send(res, csv.stamped('mango-mania-scores'),
-    csv.toCsv(csv.SCORES_COLUMNS, q.history.all()));
-});
+    csv.toCsv(csv.SCORES_COLUMNS, await q.history()));
+}));
 
-router.get('/stats', (req, res) => res.json(q.totals.get()));
+router.get('/stats', wrap(async (req, res) => res.json(await q.totals())));
 
 module.exports = router;
