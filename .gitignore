@@ -17,6 +17,12 @@ yarn.lock
 .impeccable/
 docs/
 
+# Agent skill files, written into the repo by the Vercel marketplace integration
+# when the Turso database was connected. Local tooling, not part of the game.
+.agents/
+.claude/
+skills-lock.json
+
 # Live score database. Player data, not source — and the -wal/-shm sidecars are
 # mid-transaction state that means nothing outside the machine that wrote them.
 data/
