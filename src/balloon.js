@@ -1,10 +1,11 @@
 import { Instance } from 'cooljs'
+import { pl, pw, isGameOver } from './utils'
 import * as constant from './constant'
 
 // The mango hot-air balloon. It drifts in from one side, parks beside the tower
 // top and bobs there watching the player stack, then wanders off across the
-// screen and comes back somewhere else. Pure decoration — it sits on the
-// flight layer, which paints behind the tower, so it never hides the action.
+// screen and comes back somewhere else. Pure decoration — it sits on its own
+// layer, painted after the tower, so it flies in FRONT of the blocks.
 
 // Exponential ease toward a target that stays stable across frame rates.
 const ease = (current, target, rate, dt) =>
@@ -20,10 +21,16 @@ const towerTopY = (engine) => {
     : engine.getVariable(constant.lineInitialOffset)
 }
 
+// Parking is column-relative: the balloon watches the TOWER, so it tucks
+// against the edge of the stacking column rather than the edge of the screen.
+// On a laptop that keeps it beside the action instead of stranded in a corner.
+// Drifting, by contrast, uses the whole canvas — see drift/enter.
 const parkSpot = (i, engine) => {
-  const margin = engine.width * 0.04
+  const margin = pw(engine) * 0.04
+  const left = pl(engine)
+  const right = left + pw(engine)
   return {
-    x: i.dir === 1 ? engine.width - i.w - margin : margin,
+    x: i.dir === 1 ? right - i.w - margin : left + margin,
     // Offset by the sprite's own height so the basket sits above the tower top
     // rather than at a fixed screen fraction.
     y: towerTopY(engine) - (i.h * 0.9)
@@ -103,9 +110,13 @@ const balloonAction = (instance, engine, time) => {
     i.ready = false
     return
   }
+  // Frozen scene: it hangs in the sky exactly where the run ended. Note this
+  // returns AFTER the ready check, so it keeps its position rather than
+  // re-entering from off-screen.
+  if (isGameOver(engine)) return
   if (!i.ready) {
     i.ready = true
-    i.w = engine.width * 0.17
+    i.w = pw(engine) * 0.17
     i.h = i.w * (img.height / img.width)
     i.elapsed = 0
     i.timer = 0
@@ -136,5 +147,5 @@ export const addBalloon = (game) => {
     action: balloonAction,
     painter: balloonPainter
   })
-  game.addInstance(balloon, constant.flightLayer)
+  game.addInstance(balloon, constant.balloonLayer)
 }

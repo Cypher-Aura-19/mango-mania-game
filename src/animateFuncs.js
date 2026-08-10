@@ -3,11 +3,211 @@ import { blockAction, blockPainter } from './block'
 import {
   checkMoveDown,
   getMoveDownValue,
-  drawYellowString,
-  getAngleBase
+  drawBoardString,
+  getAngleBase,
+  getReactionLevel,
+  isGameOver,
+  freezeGame,
+  pw
 } from './utils'
 import { addFlight } from './flight'
 import * as constant from './constant'
+
+// Where the cream panel sits inside a plaque PNG, as fractions of that PNG.
+// Both plaques share these because the generator lays them out proportionally;
+// tools/make-hud-plaques.py prints the numbers when it runs.
+const panelRect = {
+  x: 0.1633, y: 0.5021, w: 0.6734, h: 0.3294
+}
+// Sockets in the lives tray PNG. `first`/`pitch`/`dia` are fractions of its
+// width, `cy` of its height. Also printed by make-hud-plaques.py.
+const socketRect = {
+  first: 0.22, pitch: 0.28, cy: 0.48, dia: 0.217
+}
+// Where the gauge channel sits inside meter-track.webp, as fractions of that
+// image. meter-fill.webp is the same size with its column in the same place, which
+// is what lets the fill be drawn by cropping. Printed by
+// tools/make-satisfaction-meter.py.
+const channelRect = {
+  x: 0.224, y: 0.1038, w: 0.55, h: 0.8471
+}
+/* HUD geometry. Every SIZE below is a fraction of the stacking column (pw), so a
+ * plaque is the same size on a laptop as on a phone; only the PLACEMENT keys to
+ * the full canvas, which pushes the plaques out to the real screen corners
+ * instead of leaving them huddled around the tower. */
+const hudTop = 0.025          // fraction of the column width
+const hudMargin = 0.03
+const hudHeight = 0.22
+const livesWidth = 0.30
+const meterWidth = 0.13       // fraction of the column; height follows the art
+const meterTop = 0.36         // fraction of the column, clear of the FLOOR plaque
+const badgeSize = 0.76        // fraction of the meter's drawn width
+const numberColor = '#4A3012'
+
+// Gutter between the HUD and the edge of the SCREEN. A column-sized margin is
+// too tight to read as deliberate once the canvas is much wider than the column,
+// so it grows with the canvas up to a cap. On a portrait screen the two are the
+// same number and this is exactly the old value.
+const hudGutter = engine =>
+  Math.min(engine.width * hudMargin, pw(engine) * 0.06)
+
+// Draws a plaque of the given height, right-aligned to `right` if supplied and
+// left-aligned to `x` otherwise, then paints its live number into the panel.
+const drawPlaque = (engine, imgName, opt) => {
+  const img = engine.getImg(imgName)
+  if (!img || !img.width) return
+  const { y, height, string } = opt
+  const width = (img.width * height) / img.height
+  const x = opt.right === undefined ? opt.x : opt.right - width
+  engine.ctx.drawImage(img, x, y, width, height)
+  drawBoardString(engine, {
+    string,
+    box: {
+      x: x + (width * panelRect.x),
+      y: y + (height * panelRect.y),
+      w: width * panelRect.w,
+      h: height * panelRect.h
+    },
+    color: numberColor
+  })
+}
+
+// The lives tray: a wooden rail with three recessed sockets, one mango each.
+// Spent lives stay in their socket at low alpha so the row never reflows, and
+// the empty socket still reads as "a life used to be here".
+//
+// Anchored by its BOTTOM edge, not its top: the tray sits in the bottom-right
+// corner, and the caller knows the gutter it wants to leave below the tray but
+// not how tall the art is at this width. Deriving the top here keeps that
+// arithmetic in one place.
+const drawLives = (engine, right, bottom, width, failedCount) => {
+  const tray = engine.getImg('hudLives')
+  const mango = engine.getImg('mango')
+  if (!tray || !tray.width || !mango || !mango.width) return
+  const height = (tray.height * width) / tray.width
+  const x = right - width
+  const y = bottom - height
+  const { ctx } = engine
+  ctx.drawImage(tray, x, y, width, height)
+  // Sized to overflow its socket a little, so the fruit sits IN the hole
+  // rather than looking like a dot painted at the bottom of it.
+  const size = width * socketRect.dia * 1.34
+  const cy = y + (height * socketRect.cy)
+  for (let i = 0; i < 3; i += 1) {
+    const cx = x + (width * (socketRect.first + (i * socketRect.pitch)))
+    ctx.save()
+    if (i < failedCount) {
+      ctx.globalAlpha = 0.22
+    }
+    ctx.drawImage(mango, cx - (size / 2), cy - (size / 2), size, size)
+    ctx.restore()
+  }
+}
+
+// Customer-satisfaction gauge on the left edge, below the FLOOR plaque. The
+// frame and the empty channel are baked into the track image; only the juice
+// column, its surface glint and the reaction faces are drawn live.
+const drawMeter = (engine) => {
+  const track = engine.getImg('meterTrack')
+  const fill = engine.getImg('meterFill')
+  if (!track || !track.width || !fill || !fill.width) return
+  const { ctx } = engine
+  const colW = pw(engine)
+  const width = colW * meterWidth
+  const height = (track.height * width) / track.width
+  const x = hudGutter(engine)
+  const y = colW * meterTop
+  ctx.drawImage(track, x, y, width, height)
+
+  // What the gauge shows lags the real value, so a swing reads as the column
+  // settling rather than teleporting.
+  const value = engine.getVariable(constant.satisfaction, constant.satisfactionStart)
+  let shown = engine.getVariable(constant.satisfactionShown, value)
+  if (shown !== value) {
+    const step = engine.pixelsPerFrame(constant.satisfactionSlideRate)
+    shown = shown < value
+      ? Math.min(value, shown + step)
+      : Math.max(value, shown - step)
+    engine.setVariable(constant.satisfactionShown, shown)
+  }
+
+  const chX = x + (width * channelRect.x)
+  const chW = width * channelRect.w
+  const chY = y + (height * channelRect.y)
+  const chH = height * channelRect.h
+  const juice = Math.max(0, Math.min(1, shown / 100))
+  if (juice > 0) {
+    // The fill PNG is the same size as the track with its column in the same
+    // place, so the bottom `juice` of the source maps straight onto the bottom
+    // `juice` of the channel — no per-axis arithmetic, and the column keeps its
+    // rounded foot.
+    const srcH = fill.height * channelRect.h * juice
+    const srcTop = (fill.height * (channelRect.y + channelRect.h)) - srcH
+    const dstH = chH * juice
+    ctx.drawImage(fill, 0, srcTop, fill.width, srcH,
+      x, chY + chH - dstH, width, dstH)
+    // A bright edge along the surface. Skipped when the level sits inside the
+    // channel's rounded cap, where a flat line would poke through the wall.
+    if (juice > 0.08 && juice < 0.92) {
+      ctx.fillStyle = 'rgba(255, 238, 186, 0.8)'
+      ctx.fillRect(chX + (chW * 0.10), chY + chH - dstH, chW * 0.80,
+        Math.max(1, chW * 0.045))
+    }
+  }
+  drawReactions(engine, x, width, chY, chH, value)
+}
+
+// The customer faces standing in for the reference art's stars. Exactly one is
+// lit — the highest level the satisfaction has reached — so the lit face IS the
+// current mood and its height on the gauge shows where that mood sits.
+const drawReactions = (engine, x, width, chY, chH, value) => {
+  const { ctx } = engine
+  const size = width * badgeSize
+  const levels = constant.satisfactionLevels
+  // Same rule the reaction sounds fire on, so the lit face and the voice can
+  // never disagree. See getReactionLevel in utils.js.
+  const lit = getReactionLevel(value)
+  for (let i = 0; i < levels.length; i += 1) {
+    const active = i === lit
+    const img = engine.getImg(`reaction${i + 1}${active ? '' : 'Off'}`)
+    if (img && img.width) {
+      const cy = chY + (chH * (1 - levels[i].pos))
+      ctx.save()
+      if (!active) ctx.globalAlpha = 0.82
+      ctx.drawImage(img, x + ((width - size) / 2), cy - (size / 2), size, size)
+      ctx.restore()
+    }
+  }
+}
+
+/* Flypasts, keyed by the floor that sets them off. `id` is just a unique slot
+ * number — it names the instance and stops the same pass being added twice while
+ * the floor holds — so the artwork is named separately and can repeat.
+ *
+ * The old schedule ran 2, 6, 8, 14, 18, 22, 25 with the image tied to the slot
+ * number, which put the plane at floor 14 and the rocket at 22: heights most
+ * runs never reach, so the best art in the game went unseen. These floors
+ * front-load it — the plane is up by 5 and the rocket by 8 — and then keep
+ * cycling so a long run still gets something crossing the sky now and then.
+ *
+ * The plane climbs bottomToTop like the rocket. Both sprites are drawn nose-up
+ * from above, so flying them sideways showed the player a plane travelling
+ * broadside; rising up the screen is the one heading that matches the artwork.
+ *
+ * `sound` is the clip that plays as the pass enters. f7 is the little comet and
+ * has none — a silent streak reads fine, and something crossing the sky every
+ * few floors is more welcome when it is not always announced.
+ */
+const flightSchedule = {
+  2: { id: 1, img: 'f1', type: 'leftToRight', sound: 'flight-birds' },
+  5: { id: 2, img: 'f4', type: 'bottomToTop', sound: 'flight-plane' },
+  8: { id: 3, img: 'f6', type: 'bottomToTop', sound: 'flight-rocket' },
+  11: { id: 4, img: 'f7', type: 'rightTopToLeft', sound: 'flight-comet' },
+  14: { id: 5, img: 'f4', type: 'bottomToTop', sound: 'flight-plane' },
+  17: { id: 6, img: 'f1', type: 'rightToLeft', sound: 'flight-birds' },
+  20: { id: 7, img: 'f6', type: 'bottomToTop', sound: 'flight-rocket' },
+  24: { id: 8, img: 'f7', type: 'rightTopToLeft', sound: 'flight-comet' }
+}
 
 export const endAnimate = (engine) => {
   const gameStartNow = engine.getVariable(constant.gameStartNow)
@@ -15,68 +215,37 @@ export const endAnimate = (engine) => {
   const successCount = engine.getVariable(constant.successCount, 0)
   const failedCount = engine.getVariable(constant.failedCount)
   const gameScore = engine.getVariable(constant.gameScore, 0)
-  const threeFiguresOffset = Number(successCount) > 99 ? engine.width * 0.1 : 0
 
-  drawYellowString(engine, {
-    string: 'floor',
-    size: engine.width * 0.06,
-    x: (engine.width * 0.24) + threeFiguresOffset,
-    y: engine.width * 0.12,
-    textAlign: 'left',
-    fontName: 'Arial',
-    fontWeight: 'bold'
+  // FLOOR on the left, SCORE on the right, drawn to the same height so their
+  // panels line up. Both plaques carry their own label and mango decorations.
+  const colW = pw(engine)
+  const gutter = hudGutter(engine)
+  const height = colW * hudHeight
+  const y = colW * hudTop
+  const left = gutter
+  const right = engine.width - gutter
+  drawPlaque(engine, 'hudFloor', {
+    x: left, y, height, string: successCount
   })
-  drawYellowString(engine, {
-    string: successCount,
-    size: engine.width * 0.17,
-    x: (engine.width * 0.22) + threeFiguresOffset,
-    y: engine.width * 0.2,
-    textAlign: 'right'
+  drawPlaque(engine, 'hudScore', {
+    right, y, height, string: gameScore
   })
-  const score = engine.getImg('score')
-  const scoreWidth = score.width
-  const scoreHeight = score.height
-  const zoomedWidth = engine.width * 0.35
-  const zoomedHeight = (scoreHeight * zoomedWidth) / scoreWidth
-  engine.ctx.drawImage(
-    score,
-    engine.width * 0.61,
-    engine.width * 0.038,
-    zoomedWidth,
-    zoomedHeight
-  )
-  drawYellowString(engine, {
-    string: gameScore,
-    size: engine.width * 0.06,
-    x: engine.width * 0.9,
-    y: engine.width * 0.11,
-    textAlign: 'right'
-  })
-  const { ctx } = engine
-  const heart = engine.getImg('heart')
-  const heartWidth = heart.width
-  const heartHeight = heart.height
-  const zoomedHeartWidth = engine.width * 0.08
-  const zoomedHeartHeight = (heartHeight * zoomedHeartWidth) / heartWidth
-  for (let i = 1; i <= 3; i += 1) {
-    ctx.save()
-    if (i <= failedCount) {
-      ctx.globalAlpha = 0.2
-    }
-    ctx.drawImage(
-      heart,
-      (engine.width * 0.66) + ((i - 1) * zoomedHeartWidth),
-      engine.width * 0.16,
-      zoomedHeartWidth,
-      zoomedHeartHeight
-    )
-    ctx.restore()
-  }
+  // Lives sit in the bottom-right corner. The bottom gutter matches the side
+  // one so the tray reads as tucked into the corner rather than floating near
+  // it.
+  drawLives(engine, right, engine.height - gutter,
+    colW * livesWidth, failedCount)
+  drawMeter(engine)
+  // Last thing in the frame: if the run just ended, stop the loop here, with
+  // this fully-painted frame left on screen.
+  freezeGame(engine)
 }
 
 export const startAnimate = (engine) => {
   const gameStartNow = engine.getVariable(constant.gameStartNow)
   if (!gameStartNow) return
+  // No new blocks once the run is over — the last one stays where it fell.
+  if (isGameOver(engine)) return
   const lastBlock = engine.getInstance(`block_${engine.getVariable(constant.blockCount)}`)
   if (!lastBlock || [constant.land, constant.out, constant.tip].indexOf(lastBlock.status) > -1) {
     if (checkMoveDown(engine) && getMoveDownValue(engine)) return
@@ -97,30 +266,9 @@ export const startAnimate = (engine) => {
     engine.addInstance(block)
   }
   const successCount = Number(engine.getVariable(constant.successCount, 0))
-  switch (successCount) {
-    case 2:
-      addFlight(engine, 1, 'leftToRight')
-      break
-    case 6:
-      addFlight(engine, 2, 'rightToLeft')
-      break
-    case 8:
-      addFlight(engine, 3, 'leftToRight')
-      break
-    case 14:
-      addFlight(engine, 4, 'bottomToTop')
-      break
-    case 18:
-      addFlight(engine, 5, 'bottomToTop')
-      break
-    case 22:
-      addFlight(engine, 6, 'bottomToTop')
-      break
-    case 25:
-      addFlight(engine, 7, 'rightTopToLeft')
-      break
-    default:
-      break
+  const flight = flightSchedule[successCount]
+  if (flight) {
+    addFlight(engine, flight)
   }
 }
 
