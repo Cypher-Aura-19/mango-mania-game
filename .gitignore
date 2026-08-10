@@ -16,3 +16,19 @@ yarn.lock
 .superpowers/
 .impeccable/
 docs/
+
+# Live score database. Player data, not source — and the -wal/-shm sidecars are
+# mid-transaction state that means nothing outside the machine that wrote them.
+data/
+*.db
+*.db-wal
+*.db-shm
+_server.log
+
+# Screenshots and scratch output from the verification scripts in tools/.
+# Regenerated on demand; nothing here is a source of truth.
+.shots/
+
+# Working copies kept while reworking the gameplay backdrops.
+.bg-backup/
+__pycache__/
