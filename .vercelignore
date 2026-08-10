@@ -1,0 +1,24 @@
+# What never needs to reach the CDN or the function bundle.
+
+node_modules
+
+# The live score store. It is local-only by definition and, once the API talks
+# to the hosted DB, deploying a stale copy of it would be actively misleading.
+data
+
+# Scratch: screenshots, backdrop backups, Python caches.
+.shots
+.bg-backup
+__pycache__
+
+# Art generators and smoke tests. Build-time and dev tools, not runtime.
+tools
+
+# The PNG masters. 44MB of the 52MB assets/ folder, and the pages load exactly
+# one of them -- the favicon. Everything else is served as .webp, so shipping
+# the masters would quadruple the upload for files no browser ever requests.
+assets/**/*.png
+!assets/favicon.png
+
+# Notes, not runtime.
+*.md

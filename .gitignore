@@ -32,3 +32,13 @@ _server.log
 # Working copies kept while reworking the gameplay backdrops.
 .bg-backup/
 __pycache__/
+
+# Vercel's local project link, and the env files `vercel env pull` writes into.
+# .env.local holds the database URL and its auth token in plaintext: a live
+# credential to the production leaderboard, never a thing to commit.
+.vercel/
+.env
+.env.*
+
+.vercel
+.env*
