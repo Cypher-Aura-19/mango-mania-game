@@ -25,6 +25,11 @@ window.TowerGame = (option = {}) => {
   const coarsePointer = window.matchMedia
     ? window.matchMedia('(pointer: coarse)').matches
     : false
+  // iPadOS may identify itself as Macintosh; touch capability separates it
+  // from a real Mac. Kept on the shared option so media/effects can specialize.
+  const appleMobile = /iPad|iPhone|iPod/.test(nav.userAgent || '')
+    || ((nav.platform === 'MacIntel' || nav.platform === 'Macintosh')
+      && nav.maxTouchPoints > 1)
   const constrained = option.performanceMode === undefined
     ? (coarsePointer || nav.maxTouchPoints > 0
       || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 4)
@@ -36,6 +41,7 @@ window.TowerGame = (option = {}) => {
   // Store the resolved profile in the same options object all game systems use.
   option.performanceMode = constrained
   option.highResolution = highResolution
+  option.appleMobile = appleMobile
 
   const game = new Engine({
     canvasId,

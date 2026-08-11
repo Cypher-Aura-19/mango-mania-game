@@ -5,6 +5,7 @@
 const { chromium } = require('playwright')
 
 const BASE = (process.argv[2] || 'http://localhost:8082').replace(/\/$/, '')
+const IOS = process.env.IOS === '1'
 
 async function run(rate) {
   const browser = await chromium.launch({ channel: 'chrome' })
@@ -12,7 +13,10 @@ async function run(rate) {
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 3,
     isMobile: true,
-    hasTouch: true
+    hasTouch: true,
+    userAgent: IOS
+      ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+      : undefined
   })
   const page = await context.newPage()
   const errors = []
@@ -60,12 +64,19 @@ async function run(rate) {
     const b = g.getInstance('block_' + g.getVariable('BLOCK_COUNT'))
     const line = g.getInstance('line')
     const land = g.getAudio('land')
+    const customer = g.getInstance('customer', 'CUSTOMER_LAYER')
+    const watching = customer && customer.videos.watching
+    const option = g.getVariable('GAME_USER_OPTION') || {}
     return {
       gap: Math.abs(b.y - line.y),
       dropElapsed: g.getVariable('GAME_TIME') - b.dropBeganAt,
       fallPlayed: window.__mobileAudio.fall > 0,
       landPlayed: window.__mobileAudio.land > 0,
-      landAudible: !!land && !land.muted && land.volume > 0
+      landAudible: !!land && !land.muted && land.volume > 0,
+      appleMobile: !!option.appleMobile,
+      customerCodec: watching ? (watching.el.currentSrc || watching.el.src).split('.').pop() : '',
+      keyInterval: watching ? Math.round(watching.keyer.keyInterval) : 0,
+      keyLong: watching ? watching.keyer.keyedLong : 0
     }
   })
   const duration = Date.now() - started
@@ -91,6 +102,10 @@ async function main() {
     && r.landed.fallPlayed
     && r.landed.landPlayed
     && r.landed.landAudible
+    && (!IOS || (r.landed.appleMobile
+      && r.landed.customerCodec.indexOf('mp4') === 0
+      && r.landed.keyInterval >= 160
+      && r.landed.keyLong === 144))
     && !r.errors.length) && motionStable
   console.log('frame-time stable:', motionStable)
   console.log(ok ? 'PASS' : 'FAIL')

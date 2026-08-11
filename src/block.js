@@ -287,6 +287,13 @@ const checkBlockOut = (instance, engine) => {
  */
 const dripSoundGap = 0.9
 
+// Unlimited seam drips accumulate into many live canvas instances on WebKit.
+// Two per landed/cut cake preserve the effect without a growing iOS tax.
+const dripBudget = (engine) => {
+  const option = engine.getVariable(constant.gameUserOption) || {}
+  return option.appleMobile ? 2 : -1
+}
+
 const playDrip = (engine, time) => {
   const last = engine.getVariable(constant.dripSoundTime) || 0
   // First bead of a run: start the clock, stay quiet. Also covers the clock
@@ -384,7 +391,7 @@ const applyLand = (engine, block, line, opts) => {
   // Set up continuous slow drip from the landed block's seam.
   i.dripTimer = 0
   i.dripInterval = 0.35 + (Math.random() * 0.25)  // 0.35-0.6s per drip
-  i.dripsLeft = -1  // -1 means unlimited drips until the block scrolls off
+  i.dripsLeft = dripBudget(engine)
 }
 
 // The block lands on the tower edge but can't balance — so it topples over
@@ -408,7 +415,7 @@ const tipBlockAction = (instance, engine, time) => {
     i.originHypotenuse = Math.sqrt((i.height ** 2) + (i.outwardOffset ** 2))
     i.rotate = 0
     i.dripTimer = 0
-    i.dripsLeft = -1  // unlimited drips while the block tips and falls
+    i.dripsLeft = dripBudget(engine)
     engine.playAudio('rotate')
   }
   const isRight = i.tipDir === 1
@@ -621,7 +628,7 @@ export const blockAction = (instance, engine, time) => {
               sizeBase: instance.height * 0.18,
               dir: -1
             })
-            i.dripsLeft = -1  // unlimited drips until the block scrolls off
+            i.dripsLeft = dripBudget(engine)
           }
           if (rightCut > 1) {
             spawnFragment(engine, i, { left: overlapRight, width: rightCut, y: blockY, fallDir: 1, cutSide: 'left', cutJag: i.cutJag })
@@ -634,7 +641,7 @@ export const blockAction = (instance, engine, time) => {
               sizeBase: instance.height * 0.18,
               dir: 1
             })
-            i.dripsLeft = -1  // unlimited drips until the block scrolls off
+            i.dripsLeft = dripBudget(engine)
           }
         }
       }
@@ -977,7 +984,7 @@ const spawnCream = (engine, {
   // one frame. Preserve single drips, but halve decorative bursts on the mobile
   // performance profile so input and physics remain the frame priority.
   const particleCount = gameOption.performanceMode && count > 1
-    ? Math.max(1, Math.ceil(count * 0.5))
+    ? Math.max(1, Math.ceil(count * (gameOption.appleMobile ? 0.3 : 0.5)))
     : count
   for (let n = 0; n < particleCount; n += 1) {
     const p = new Instance({

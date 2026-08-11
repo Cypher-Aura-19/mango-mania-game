@@ -48,6 +48,11 @@ const KEY_FPS = 20
 const MOBILE_MASK_LONG = 80
 const MOBILE_KEYED_LONG = 192
 const MOBILE_KEY_FPS = 12
+// WebKit video-to-canvas readback is the expensive path on iPhone/iPad. Keep
+// the decorative customer deliberately light so gameplay owns the main thread.
+const APPLE_MASK_LONG = 48
+const APPLE_KEYED_LONG = 144
+const APPLE_KEY_FPS = 6
 // Dilation radius. 2 = the reference's 5x5 kernel.
 const RADIUS = 2
 // The box the clip is fitted into, as fractions of the stacking column. Fitting
@@ -119,7 +124,11 @@ const MOODS = {
  * canPlayType answers 'probably' / 'maybe' / '' — anything non-empty means the
  * browser is willing, and a codecs= string is what makes the answer meaningful
  * rather than a guess about the container. */
-const clipUrl = (mood) => {
+const clipUrl = (mood, appleMobile) => {
+  // Apple recommends H.264 MP4 for static Safari video. Newer iOS versions may
+  // report VP9/WebM support even where that particular device/browser path is
+  // less power-efficient than its long-established H.264 hardware decoder.
+  if (appleMobile) return `./assets/${MOODS[mood]}.mp4`
   const probe = document.createElement('video')
   const webm = probe.canPlayType('video/webm; codecs="vp9"')
   return `./assets/${MOODS[mood]}.${webm ? 'webm' : 'mp4'}`
@@ -163,7 +172,7 @@ const restSpot = (i, engine) => {
  * frame costs no allocation at all — the reference page allocates a fresh
  * ImageData per frame, which is the one thing it does that a 60fps game cannot
  * afford. Sized on first use, when the video finally reports its resolution. */
-function makeKeyer(performanceMode) {
+function makeKeyer(performanceMode, appleMobile) {
   return {
     ready: false,
     // The visible result: a canvas the size the clip is drawn at, with the
@@ -189,9 +198,12 @@ function makeKeyer(performanceMode) {
     // of the same video frame is never keyed twice.
     lastFrame: -1,
     lastKeyAt: -Infinity,
-    maskLong: performanceMode ? MOBILE_MASK_LONG : MASK_LONG,
-    keyedLong: performanceMode ? MOBILE_KEYED_LONG : KEYED_LONG,
-    keyInterval: 1000 / (performanceMode ? MOBILE_KEY_FPS : KEY_FPS),
+    maskLong: appleMobile ? APPLE_MASK_LONG
+      : (performanceMode ? MOBILE_MASK_LONG : MASK_LONG),
+    keyedLong: appleMobile ? APPLE_KEYED_LONG
+      : (performanceMode ? MOBILE_KEYED_LONG : KEYED_LONG),
+    keyInterval: 1000 / (appleMobile ? APPLE_KEY_FPS
+      : (performanceMode ? MOBILE_KEY_FPS : KEY_FPS)),
     smoothingQuality: performanceMode ? 'low' : 'medium'
   }
 }
@@ -386,12 +398,12 @@ function frameId(video) {
  * on the frame already being drawn. What parking buys is that a reaction never
  * has to REWIND at the moment it is wanted, which is a seek landing exactly on
  * the frame the player is looking at. */
-function makeVideos(performanceMode) {
+function makeVideos(performanceMode, appleMobile) {
   const vids = {}
   Object.keys(MOODS).forEach((mood) => {
     const resting = mood === 'watching'
     const v = document.createElement('video')
-    v.src = clipUrl(mood)
+    v.src = clipUrl(mood, appleMobile)
     v.muted = true
     v.defaultMuted = true
     v.loop = resting
@@ -411,7 +423,7 @@ function makeVideos(performanceMode) {
     a.loop = resting
     a.preload = 'auto'
     a.volume = resting ? VOICE_REST_LEVEL : VOICE_LEVEL
-    vids[mood] = { el: v, voice: a, keyer: makeKeyer(performanceMode) }
+    vids[mood] = { el: v, voice: a, keyer: makeKeyer(performanceMode, appleMobile) }
     const play = () => { const p = v.play(); if (p && p.catch) p.catch(() => {}) }
     if (resting) {
       play()
@@ -753,7 +765,7 @@ export const addCustomer = (game, onProgress) => {
    * The returned promise is what the page waits on; see the loading gate in
    * index.html / index-blink.html. */
   const gameOption = game.getVariable(constant.gameUserOption) || {}
-  const videos = makeVideos(!!gameOption.performanceMode)
+  const videos = makeVideos(!!gameOption.performanceMode, !!gameOption.appleMobile)
   const customer = new Instance({
     name: 'customer',
     action: customerAction,

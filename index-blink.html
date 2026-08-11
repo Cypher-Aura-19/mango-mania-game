@@ -517,7 +517,7 @@
   <div id="blinkDot" class="connecting"></div>
 
   <!-- Tower game bundle (exposes window.TowerGame) -->
-  <script src="./dist/main.js?v=20260811-mobile-physics"></script>
+  <script src="./dist/main.js?v=20260811-ios-performance"></script>
 
   <!-- Global leaderboard client (exposes window.MangoBoard) -->
   <script src="./assets/leaderboard-client.js"></script>
@@ -541,9 +541,11 @@
   const MAX_BLINK_MS = 500;       // ignore deliberate long closes
   // Minimum gap between accepted blinks (prevents double-trigger)
   const BLINK_COOLDOWN_MS = 300;
-  // 20Hz comfortably catches a human blink while avoiding needless camera
-  // bitmap uploads and GPU inference that compete with canvas rendering.
-  const DETECT_INTERVAL_MS = 1000 / 20;
+  const APPLE_MOBILE = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    ((navigator.platform === 'MacIntel' || navigator.platform === 'Macintosh') && navigator.maxTouchPoints > 1);
+  // iOS shares a tighter graphics budget between camera inference, video and
+  // canvas. 15Hz still samples a normal blink multiple times; others keep 20Hz.
+  const DETECT_INTERVAL_MS = 1000 / (APPLE_MOBILE ? 15 : 20);
 
   /* ============================================================
      DOM REFS
