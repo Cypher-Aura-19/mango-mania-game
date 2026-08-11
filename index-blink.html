@@ -2,6 +2,7 @@
 <html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    <meta name="theme-color" content="#f68827">
 <title>Tower Building - Blink Edition</title>
 <link rel="icon" type="image/x-icon" href="./assets/favicon.png">
 <link rel="preload" href="./assets/background.webp" as="image" fetchpriority="high">
@@ -24,14 +25,19 @@
   }
   * { margin: 0; padding: 0; }
   img { width: 100%; }
-  html { background: #fff; height: 100%; }
+  /* The art, not a flat colour: this is what the browser paints OUTSIDE the
+       body -- the rubber-band gap above and below the page on a phone, and the
+       fill behind the top and bottom browser bars. It used to be a red that
+       appears nowhere in the game. Left at its natural size and tiling, exactly
+       like the body below, so the seam is invisible and the menu is untouched. */
+    html { background: #f68827 url(assets/main-bg.webp); height: 100%; }
   body {
     font-family: Audex, "Helvetica Neue", Arial, Helvetica, sans-serif;
     margin: 0 auto;
     text-align: center;
     width: 100%;
     height: 100%;
-    background: #f95240 url(assets/main-bg.webp);
+    background: #f68827 url(assets/main-bg.webp);
     overflow: hidden;
   }
 
