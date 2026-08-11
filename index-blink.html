@@ -404,7 +404,7 @@
          the progress panel until every asset, the blink model and the camera
          are in, at which point it holds the PLAY button instead. -->
     <div class="landing loading">
-      <div class="action-1"><img src="./assets/main-index-title.webp" class="title swing"></div>
+      <div class="action-1"><img src="./assets/main-index-title.webp?v=20260811-audio-assets" class="title swing"></div>
       <div class="action-2">
         <div class="load-panel">
           <div class="load-head">Loading...</div>
@@ -517,7 +517,7 @@
   <div id="blinkDot" class="connecting"></div>
 
   <!-- Tower game bundle (exposes window.TowerGame) -->
-  <script src="./dist/main.js?v=20260811-ios-performance"></script>
+  <script src="./dist/main.js?v=20260811-audio-assets"></script>
 
   <!-- Global leaderboard client (exposes window.MangoBoard) -->
   <script src="./assets/leaderboard-client.js"></script>
@@ -788,6 +788,11 @@
     'medal-1', 'medal-2', 'medal-3',
     'avatar1', 'avatar2', 'avatar3', 'avatar4', 'avatar5', 'avatar6'
   ];
+  const ASSET_REV = '?v=20260811-audio-assets';
+  const pageImageUrl = (name) => {
+    const resized = name === 'main-index-title' || name.indexOf('avatar') === 0;
+    return `./assets/${name}.webp${resized ? ASSET_REV : ''}`;
+  };
 
   /* The sign is already in the markup and already swinging, so it cannot be
    * waited for like the rest -- it has to be faded in where it stands. Its box
@@ -814,7 +819,7 @@
     PAGE_IMAGES.forEach((name) => {
       const img = new Image();
       img.onerror = step;
-      img.src = './assets/' + name + '.webp';
+      img.src = pageImageUrl(name);
       if (img.decode) {
         img.decode().then(step, step);
       } else {
@@ -1349,7 +1354,7 @@
   function buildAvatars() {
     const host = document.getElementById('avatars');
     host.innerHTML = AVATARS
-      .map((a, n) => `<div class="avatar" data-avatar="${a}"><img src="./assets/${a}.webp" alt="Avatar ${n + 1}" decoding="async"></div>`)
+      .map((a, n) => `<div class="avatar" data-avatar="${a}"><img src="./assets/${a}.webp${ASSET_REV}" alt="Avatar ${n + 1}" decoding="async"></div>`)
       .join('');
     host.querySelectorAll('.avatar').forEach(el => {
       el.addEventListener('click', () => selectAvatar(el.getAttribute('data-avatar')));
@@ -1403,31 +1408,8 @@
   }
 
   function startBgm() {
-    const bgmAudio = game.getAudio('bgm');
-    if (!bgmAudio) return;
-    bgmAudio.muted = true;
-    bgmAudio.loop = true;
-    const playPromise = bgmAudio.play();
-    if (playPromise !== undefined) {
-      playPromise.then(() => {
-        setTimeout(() => { bgmAudio.muted = false; }, 100);
-      }).catch(() => {
-        let bgmStarted = false;
-        const resumeOnce = () => {
-          if (bgmStarted || !game) return;
-          bgmStarted = true;
-          const audio = game.getAudio('bgm');
-          if (!audio || audio.paused) {
-            audio.muted = false;
-            game.playBgm();
-          }
-          document.removeEventListener('click', resumeOnce);
-          document.removeEventListener('touchstart', resumeOnce);
-        };
-        document.addEventListener('click', resumeOnce);
-        document.addEventListener('touchstart', resumeOnce);
-      });
-    }
+    // TowerGame owns autoplay fallback and retries inside a real gesture.
+    game.playBgm();
   }
 
   function initGame() {
@@ -1537,7 +1519,7 @@
     + (i < 3
       ? `<img class="lb-medal" src="./assets/medal-${i + 1}.webp" alt="${i + 1}" decoding="async">`
       : `<span class="lb-rank ${e.me ? 'mine' : ''}">${i + 1}</span>`)
-    + `<img class="lb-face" src="./assets/${e.avatar}.webp" alt="" decoding="async">`
+    + `<img class="lb-face" src="./assets/${e.avatar}.webp${ASSET_REV}" alt="" decoding="async">`
     + `<span class="lb-name"><b>${esc(e.name)}</b>`
       + `${e.company ? `<i>${esc(e.company)}</i>` : ''}</span>`
     // Outside .lb-name on purpose: in the top three a medal replaces the rank

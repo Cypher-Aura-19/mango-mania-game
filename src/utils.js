@@ -318,7 +318,9 @@ export const addFailedCount = (engine) => {
   if (setGameFailed) setGameFailed(failed)
   if (failed >= 3) {
     engine.pauseAudio('bgm')
-    engine.playAudio('game-over')
+    // Rewind just like every other one-shot. A previous silent warm-up or an
+    // unusually fast replay must not leave the shared element at its tail.
+    playSfx(engine, 'game-over')
     /* Freeze, don't reset. This used to clear gameStartNow, which is the MENU
      * flag — so the backdrop flipped to the title art and the HUD vanished
      * while the tower carried on wobbling underneath. Marking the run over

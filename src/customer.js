@@ -517,6 +517,9 @@ function startClipAndVoice(engine, mood, i) {
   if (p && p.catch) p.catch(() => {})
   if (!engine.soundOn) return
   try { voice.currentTime = el.currentTime || 0 } catch (e) { /* not seekable yet */ }
+  // A reaction can start while the first-gesture silent warm-up is resolving.
+  // Restore its real level and make that old promise unable to pause the voice.
+  if (voice._cancelWarm) voice._cancelWarm()
   const q = voice.play()
   if (q && q.catch) q.catch(() => {})
 }

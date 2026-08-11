@@ -50,7 +50,9 @@ window.TowerGame = (option = {}) => {
     height,
     soundOn
   })
-  const pathGenerator = (path) => `./assets/${path}`
+  // Vercel serves assets as immutable for a year. Rev the URL so returning
+  // phones receive the resized sprites instead of their cached print versions.
+  const pathGenerator = (path) => `./assets/${path}?v=20260811-audio-assets`
 
   game.addImg('background', pathGenerator('background.webp'))
   game.addImg('gamebg', pathGenerator('game-bg-1.webp'))
@@ -221,19 +223,70 @@ window.TowerGame = (option = {}) => {
    * instead, which folds both into the same loading bar. */
   game.customerReady = addCustomer(game, option.onCustomerProgress)
 
-  /* Unlock every HTML media element during a real gesture. Mobile Safari can
-   * authorize one element but continue blocking its siblings; the falling and
-   * landing sounds start on a later animation frame, so merely playing a click
-   * sound from the tap is not enough. Warm all effects and customer voices at
-   * zero volume while the gesture is active, then rewind them for real use. */
+  /* The stock engine treats an Audio element as loaded as soon as it is created
+   * and swallows play() failures. On mobile that creates two hard-to-see races:
+   * an effect can be requested before its first bytes are decoded, and the BGM
+   * can be paused by the bulk "unlock" after a page-level fallback started it.
+   * Own playback here so persistent sounds can retry once data is available and
+   * so a real play always cancels an in-flight silent warm-up. */
+  const enginePauseAudio = game.pauseAudio.bind(game)
+  game.playAudio = (name, loop = false) => {
+    if (!game.soundOn) return Promise.resolve(false)
+    const audio = game.getAudio(name)
+    if (!audio) return Promise.resolve(false)
+    if (name === 'bgm') game._bgmWanted = true
+    if (audio._cancelWarm) audio._cancelWarm()
+    audio._warmToken = null
+    audio.loop = loop
+    audio.muted = false
+    const attempt = () => {
+      let promise
+      try { promise = audio.play() } catch (e) { promise = Promise.reject(e) }
+      if (!promise || !promise.catch) return Promise.resolve(true)
+      return promise.then(() => true).catch((error) => {
+        // A gesture will retry BGM. A decode/network miss on either long-lived
+        // cue gets one canplay retry instead of being silently discarded.
+        if (error && error.name === 'NotAllowedError') return false
+        if ((name === 'bgm' || name === 'game-over') && !audio._readyRetry) {
+          audio._readyRetry = true
+          audio.addEventListener('canplay', () => {
+            audio._readyRetry = false
+            if (name !== 'bgm' || game._bgmWanted) attempt()
+          }, { once: true })
+          audio.preload = 'auto'
+          try { audio.load() } catch (e) { /* browser will retry naturally */ }
+        }
+        return false
+      })
+    }
+    return attempt()
+  }
+  game.pauseAudio = (name) => {
+    if (name === 'bgm') game._bgmWanted = false
+    enginePauseAudio(name)
+  }
+
+  /* Unlock the small gameplay effects during a real gesture. BGM is deliberately
+   * started separately and never included in the pause/rewind warm-up. Starting
+   * sixteen audio/video elements together was both the missing-music race and a
+   * burst of decoder work on Android/iOS. */
   game.unlockAudio = () => {
-    if (!game.soundOn || game._mediaUnlocked) return
+    if (!game.soundOn) return
     // An async camera permission callback may no longer have autoplay rights.
     // Keep the method retryable for the next real tap in that case.
     if (nav.userActivation && !nav.userActivation.isActive) return
+    const firstUnlock = !game._mediaUnlocked
     game._mediaUnlocked = true
-    const media = Object.keys(game.assetsObj.audio)
-      .map(name => game.assetsObj.audio[name])
+    // playBgm() may already have failed outside a gesture; this call is inside
+    // the gesture and is the authoritative start. Never pause it below.
+    game.playBgm()
+    if (!firstUnlock) return
+    const media = [
+      'drop-perfect', 'drop', 'game-over', 'rotate', 'click',
+      'swing', 'fall', 'land', 'clip', 'drip'
+    ].map(name => game.getAudio(name)).filter(Boolean)
+    // Customer voices are separate Audio elements. Warm those three too so
+    // Safari cannot authorize the effects while leaving reactions silent.
     const customer = game.getInstance('customer', constant.customerLayer)
     if (customer && customer.videos) {
       Object.keys(customer.videos).forEach((mood) => {
@@ -242,11 +295,23 @@ window.TowerGame = (option = {}) => {
     }
     media.forEach((el) => {
       if (!el || !el.paused) return
+      const token = {}
+      el._warmToken = token
       const level = el.volume
       const wasMuted = el.muted
+      el._cancelWarm = () => {
+        if (el._warmToken !== token) return
+        el._warmToken = null
+        el.volume = level
+        el.muted = wasMuted
+      }
       el.muted = false
       el.volume = 0
       const done = () => {
+        // A real effect may have reused this element while play() was resolving.
+        if (el._warmToken !== token) return
+        el._warmToken = null
+        el._cancelWarm = null
         el.pause()
         try { el.currentTime = 0 } catch (e) { /* not seekable yet */ }
         el.volume = level
@@ -283,12 +348,19 @@ window.TowerGame = (option = {}) => {
   }
 
   game.playBgm = () => {
-    game.playAudio('bgm', true)
+    game._bgmWanted = true
+    return game.playAudio('bgm', true)
   }
 
   game.pauseBgm = () => {
     game.pauseAudio('bgm')
   }
+
+  // Mobile browsers can suspend media when switching apps or opening camera
+  // permission UI. Resume the requested music when the page becomes active.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && game._mediaUnlocked && game._bgmWanted) game.playBgm()
+  })
 
   /* The page's buttons live in the DOM, not in the engine, so they get a hook
    * rather than reaching into the audio map themselves. playSfx and not
