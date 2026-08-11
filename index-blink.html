@@ -268,14 +268,21 @@
      fully-occluded videos, which would freeze blink detection.
      Off-screen keeps frame delivery alive without showing anything.
      ============================================================ */
+  /* Present, but not something you can see.
+     This used to sit at left:-9999px, and WebKit treats a video parked that far
+     outside the viewport as not worth decoding -- the element plays, the camera
+     light is on, and every frame drawn from it comes back blank. Keeping it on
+     screen at 2px with a whisper of opacity answers "is this rendered?" while
+     staying invisible beside the dot in the same corner. */
   #webcam {
     position: fixed;
-    left: -9999px;
-    top: 0;
-    width: 320px;
-    height: 240px;
-    opacity: 1;
+    right: 2px;
+    bottom: 2px;
+    width: 2px;
+    height: 2px;
+    opacity: .01;
     pointer-events: none;
+    z-index: 1;
   }
 
   /* ============================================================
@@ -605,6 +612,17 @@
   // Read-only troubleshooting hook for Safari remote inspection.
   window.__blinkDebug = blinkDebug;
 
+  /* The six landmarks per eye that the blink test reads, and the ratio itself.
+   * Declared here and interpolated into the worker source below, so the two
+   * engines -- worker and main-thread fallback -- cannot drift apart. */
+  const EYE_LEFT  = [33, 160, 158, 133, 153, 144];
+  const EYE_RIGHT = [362, 385, 387, 263, 373, 380];
+  function eyeAspect(lm, idx) {
+    const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    return (d(lm[idx[1]], lm[idx[5]]) + d(lm[idx[2]], lm[idx[4]]))
+      / (2 * d(lm[idx[0]], lm[idx[3]]));
+  }
+
   // Audio unlock state - see unlockAudio() below.
   let audioUnlocked = false;
 
@@ -613,6 +631,10 @@
      ============================================================ */
   let blinkWorker = null;   // MediaPipe runs entirely inside this Web Worker
   let workerReady = false;  // worker's model finished loading
+  let localLandmarker = null;  // set ONLY when the worker cannot be used - see startLocalEngine
+  let localReady = false;
+  let localStarting = false;
+  let localTs = -1;         // detectForVideo demands a strictly rising timestamp
   let blinkReady = false;   // model loaded AND camera streaming
   let frameInFlight = false; // don't queue a new frame while one is being processed
 
@@ -742,7 +764,7 @@
   document.addEventListener('keydown', unlockOnGesture);
 
   function updateBlinkReadiness() {
-    const nowReady = workerReady && cameraOk;
+    const nowReady = (workerReady || localReady) && cameraOk;
     if (nowReady !== blinkReady) {
       blinkReady = nowReady;
       if (blinkReady) {
@@ -983,6 +1005,13 @@
       const block = game.getInstance('block_' + count);
       useful = !block || block.status === 'SWING';
     }
+    /* iOS suspends the element when the phone sleeps or the tab goes to the
+     * background, and it does not resume by itself -- without this the pipeline
+     * stalls for the rest of the run while the camera light stays on. */
+    if (video.srcObject && video.paused) {
+      const resume = video.play();
+      if (resume && resume.catch) resume.catch(() => {});
+    }
     if (useful && blinkReady && !frameInFlight && video.readyState >= 2 && !video.paused) {
       /* Lock before conversion. On a slow phone, locking inside .then() allowed
        * several conversions to queue during the same inference and eventually
@@ -990,9 +1019,17 @@
       frameInFlight = true;
       blinkDebug.captureAttempts += 1;
 
+      // No worker to ship to: same inference, same result path, this thread.
+      if (localLandmarker) {
+        localDetect();
+        setTimeout(detectTick, DETECT_INTERVAL_MS);
+        return;
+      }
+
       let framePromise;
       try {
         if (PHONE_CAPTURE && captureContext) {
+          syncCaptureSize();
           captureContext.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
           framePromise = createImageBitmap(captureCanvas);
         } else {
@@ -1030,11 +1067,7 @@
       return;
     }
     if (msg.type === 'error') {
-      console.error('[Blink] Worker failed:', msg.message);
-      modelDone = true; modelProgress = 1;
-      loadWarn.textContent = '⚠ Blink engine failed to load - tap/click to play';
-      renderProgress();
-      checkAllReady();
+      startLocalEngine(msg.message);
       return;
     }
     if (msg.type === 'result') {
@@ -1064,21 +1097,51 @@
   /* ============================================================
      CAMERA (requested during load so permission is handled up front)
      ============================================================ */
+  /* Preferences, NOT limits.
+   *
+   * This used to ask for width/height with `max: 320`, which is a hard ceiling:
+   * a front camera whose smallest offering is 640x480 -- common on Android --
+   * makes getUserMedia reject outright with OverconstrainedError. The player
+   * grants permission, answers the prompt, and no stream ever arrives, so
+   * cameraOk stays false and the dot stays amber with nothing explaining why.
+   * `ideal` lets the browser hand over the nearest thing it has, and
+   * syncCaptureSize scales whatever that is down to fit 320x240 before
+   * inference, so the small-frame intent survives without the veto. */
+  const CAM_TRIES = [
+    { video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' }, audio: false },
+    { video: { facingMode: 'user' }, audio: false },
+    { video: true, audio: false }
+  ];
+
+  async function getCamStream() {
+    let lastErr = null;
+    for (let i = 0; i < CAM_TRIES.length; i += 1) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(CAM_TRIES[i]);
+        blinkDebug.camConstraint = i;   // 0 = got the size we asked for
+        return stream;
+      } catch (err) {
+        lastErr = err;
+        /* A refusal is final -- retrying a denied permission just re-prompts and
+         * annoys. Anything else (over-constrained, camera busy, no such device)
+         * is worth one more attempt with a looser ask. */
+        const name = err && err.name;
+        if (name === 'NotAllowedError' || name === 'SecurityError') throw err;
+        blinkDebug.lastError = name + ': ' + (err && err.message);
+        console.warn('[Blink] Camera request ' + i + ' failed (' + name + '), loosening constraints');
+      }
+    }
+    throw lastErr;
+  }
+
   async function startCam() {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 320, max: 320 }, height: { ideal: 240, max: 240 }, facingMode: 'user' },
-      audio: false
-    });
+    const stream = await getCamStream();
     video.srcObject = stream;
     await video.play();
     /* Preserve the real stream aspect ratio. Portrait phones often ignore the
      * requested 4:3 dimensions; stretching those frames hurts face detection. */
-    const sourceWidth = video.videoWidth || 320;
-    const sourceHeight = video.videoHeight || 240;
-    const scale = Math.min(1, 320 / sourceWidth, 240 / sourceHeight);
-    captureCanvas.width = Math.max(1, Math.round(sourceWidth * scale));
-    captureCanvas.height = Math.max(1, Math.round(sourceHeight * scale));
-    blinkDebug.cameraSize = sourceWidth + 'x' + sourceHeight;
+    await waitForVideoMetadata(3000);
+    syncCaptureSize();
     cameraOk = true;
     // Camera permission grant is a user gesture -> unlocks autoplay sound.
     unlockAudio();
@@ -1134,18 +1197,13 @@
 
       const CLOSE_THRESHOLD = ${CLOSE_THRESHOLD};
       const OPEN_THRESHOLD  = ${OPEN_THRESHOLD};
-      const LEFT_EYE  = [33, 160, 158, 133, 153, 144];
-      const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
+      const LEFT_EYE  = ${JSON.stringify(EYE_LEFT)};
+      const RIGHT_EYE = ${JSON.stringify(EYE_RIGHT)};
 
       let landmarker = null;
       let lastTs = -1;
 
-      function dist(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return Math.hypot(dx, dy); }
-      function ear(lm, idx) {
-        const p1 = lm[idx[0]], p2 = lm[idx[1]], p3 = lm[idx[2]];
-        const p4 = lm[idx[3]], p5 = lm[idx[4]], p6 = lm[idx[5]];
-        return (dist(p2, p6) + dist(p3, p5)) / (2 * dist(p1, p4));
-      }
+      const ear = ${eyeAspect.toString()};
 
       async function init() {
         const mod = await import('${VISION_MJS}');
@@ -1202,16 +1260,152 @@
     blinkWorker = new Worker(blobUrl);
     blinkWorker.onmessage = onWorkerMessage;
     blinkWorker.onerror = (err) => {
-      console.error('[Blink] Worker error:', err.message);
+      startLocalEngine('worker error: ' + (err && err.message));
+    };
+    modelProgress = 0.7;
+    renderProgress();
+    /* A worker that reports neither ready NOR error is the worst case, and it is
+     * a real one: WebKit can hang on the import() rather than throwing. Nothing
+     * would ever set modelDone, so the bar would sit there and the dot would stay
+     * amber for the whole session. Give it a window, then take the work back. */
+    setTimeout(() => {
+      if (!workerReady && !localReady) startLocalEngine('worker silent for 15s');
+    }, 15000);
+    // 'ready' / 'error' arrive via onWorkerMessage → sets modelDone.
+    return Promise.resolve();
+  }
+
+  /* ---- fallback engine: MediaPipe on the MAIN thread ----------------------
+   * The worker stays the fast path. But it reaches MediaPipe with a dynamic
+   * import() from inside a CLASSIC worker, and WebKit has shipped versions where
+   * that is not available at all -- so on those phones the worker dies on its
+   * first line, blinkReady never goes true, and the dot sits amber forever with
+   * the camera granted and nothing behind it. That is the bug this fixes.
+   *
+   * The page itself is a module, where the same import is ordinary and works.
+   * Inference here costs main-thread time, which is exactly why it is not the
+   * default -- but a blink test at 12Hz is cheap, and a game that reads your
+   * blink beats a smoother one that cannot. */
+  async function startLocalEngine(why) {
+    if (localLandmarker || localStarting) return;
+    localStarting = true;
+    blinkDebug.engine = 'main-thread';
+    blinkDebug.workerFailure = String(why || '');
+    console.warn('[Blink] Worker unusable (' + why + ') - running MediaPipe on the main thread');
+    if (blinkWorker) {
+      try { blinkWorker.terminate(); } catch (e) { /* already gone */ }
+      blinkWorker = null;
+    }
+    try {
+      const mod = await import(VISION_MJS);
+      const vision = await mod.FilesetResolver.forVisionTasks(WASM_PATH);
+      const opts = {
+        baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
+        runningMode: 'VIDEO', numFaces: 1,
+        minFaceDetectionConfidence: 0.5, minFacePresenceConfidence: 0.5, minTrackingConfidence: 0.5,
+        outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false
+      };
+      try {
+        localLandmarker = await mod.FaceLandmarker.createFromOptions(vision, opts);
+        blinkDebug.delegate = 'GPU';
+      } catch (gpuErr) {
+        // Phone GPU delegates fail more often than desktop ones; CPU still holds 12Hz.
+        opts.baseOptions.delegate = 'CPU';
+        localLandmarker = await mod.FaceLandmarker.createFromOptions(vision, opts);
+        blinkDebug.delegate = 'CPU';
+      }
+      localReady = true;
+      frameInFlight = false;   // nothing is in flight to a worker that is gone
+      modelDone = true; modelProgress = 1;
+      loadWarn.textContent = '';
+      console.info('[Blink] Main-thread engine ready (' + blinkDebug.delegate + ')');
+      updateBlinkReadiness();
+      renderProgress();
+      checkAllReady();
+    } catch (err) {
+      blinkDebug.lastError = String(err && (err.message || err));
+      console.error('[Blink] Main-thread engine failed too:', err);
       modelDone = true; modelProgress = 1;
       loadWarn.textContent = '⚠ Blink engine failed to load - tap/click to play';
       renderProgress();
       checkAllReady();
-    };
-    modelProgress = 0.7;
-    renderProgress();
-    // 'ready' / 'error' arrive via onWorkerMessage → sets modelDone.
-    return Promise.resolve();
+    }
+  }
+
+  // One frame, inferred here. detectForVideo is synchronous in VIDEO mode, so the
+  // result goes to the SAME handler the worker posts to - one result path, both
+  // engines, no second copy of the blink state machine.
+  function localDetect() {
+    let face = false, avgEar = 1, frameError = '';
+    try {
+      let source = video;
+      if (PHONE_CAPTURE && captureContext) {
+        syncCaptureSize();
+        captureContext.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+        source = captureCanvas;
+      }
+      blinkDebug.framesSent += 1;
+      const t = Math.max(performance.now(), localTs + 1);
+      localTs = t;
+      const res = localLandmarker.detectForVideo(source, t);
+      if (res && res.faceLandmarks && res.faceLandmarks.length > 0) {
+        const lm = res.faceLandmarks[0];
+        avgEar = (eyeAspect(lm, EYE_LEFT) + eyeAspect(lm, EYE_RIGHT)) / 2;
+        face = true;
+      }
+    } catch (err) {
+      frameError = String(err && (err.message || err));
+      blinkDebug.captureErrors += 1;
+      blinkDebug.lastError = frameError;
+    }
+    onWorkerMessage({ data: { type: 'result', face, avgEar, frameError } });
+  }
+
+  /* Size the capture canvas from the LIVE stream, and keep checking.
+   *
+   * This used to be measured once, the instant play() resolved -- and on a real
+   * phone videoWidth is still 0 for a beat after that, so the measurement fell
+   * back to 320x240 while the camera was in fact handing over a PORTRAIT frame.
+   * drawImage then squashed a portrait face into a 4:3 box, and a face stretched
+   * like that is one MediaPipe frequently cannot find AT ALL: permission granted,
+   * frames flowing, dot amber for the whole run. Re-checking costs two integer
+   * comparisons a frame, and it also survives the camera being rotated or the
+   * track being swapped mid-run. */
+  function syncCaptureSize() {
+    const sw = video.videoWidth, sh = video.videoHeight;
+    if (!sw || !sh) return;
+    const scale = Math.min(1, 320 / sw, 240 / sh);
+    const w = Math.max(1, Math.round(sw * scale));
+    const h = Math.max(1, Math.round(sh * scale));
+    if (captureCanvas.width !== w || captureCanvas.height !== h) {
+      captureCanvas.width = w;
+      captureCanvas.height = h;
+    }
+    blinkDebug.cameraSize = sw + 'x' + sh;
+  }
+
+  /* play() resolving does NOT mean the dimensions are known - on both phone
+   * platforms videoWidth stays 0 a moment longer. Anything measured before this
+   * settles is a guess, and in portrait the guess was wrong. */
+  function waitForVideoMetadata(timeoutMs) {
+    if (video.videoWidth && video.videoHeight) return Promise.resolve();
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearInterval(poll);
+        clearTimeout(bail);
+        video.removeEventListener('loadedmetadata', finish);
+        resolve();
+      };
+      const check = () => { if (video.videoWidth && video.videoHeight) finish(); };
+      video.addEventListener('loadedmetadata', finish);
+      const poll = setInterval(check, 60);
+      // Never block the load on this: a stream with no readable dimensions is
+      // still worth trying, and syncCaptureSize will pick them up when they land.
+      const bail = setTimeout(finish, timeoutMs || 3000);
+    });
   }
 
   /* ============================================================

@@ -18,7 +18,11 @@ const { chromium } = require('playwright')
 const BASE = (process.argv[2] || 'http://localhost:8082').replace(/\/$/, '')
 
 async function check(path, label) {
-  const browser = await chromium.launch()
+  /* channel: 'chrome' to match the other checks in here. The bundled headless
+   * shell is a separate download from the global Playwright install and goes
+   * missing whenever that install is updated, which fails this script with a
+   * "browser not found" that reads like a broken page. */
+  const browser = await chromium.launch({ channel: 'chrome' })
   const ctx = await browser.newContext({
     viewport: { width: 420, height: 760 },
     permissions: ['camera'],
