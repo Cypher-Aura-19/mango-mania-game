@@ -35,9 +35,16 @@ async function run(rate) {
   const cdp = await context.newCDPSession(page)
   await cdp.send('Emulation.setCPUThrottlingRate', { rate })
   await page.evaluate(() => {
-    window.__mobileAudio = { fall: 0, land: 0 }
-    window.game.getAudio('fall').addEventListener('play', () => { window.__mobileAudio.fall += 1 })
-    window.game.getAudio('land').addEventListener('play', () => { window.__mobileAudio.land += 1 })
+    const mixer = window.game.appleAudio
+    window.__mobileAudio = {
+      mixer: !!mixer,
+      fall: mixer ? (mixer.playCounts.fall || 0) : 0,
+      land: mixer ? (mixer.playCounts.land || 0) : 0
+    }
+    if (!mixer) {
+      window.game.getAudio('fall').addEventListener('play', () => { window.__mobileAudio.fall += 1 })
+      window.game.getAudio('land').addEventListener('play', () => { window.__mobileAudio.land += 1 })
+    }
   })
   const started = Date.now()
   await page.touchscreen.tap(195, 500)
@@ -47,11 +54,14 @@ async function run(rate) {
     const b = g.getInstance('block_' + g.getVariable('BLOCK_COUNT'))
     const line = g.getInstance('line')
     const fall = g.getAudio('fall')
+    const mixer = g.appleAudio
     return {
       status: b.status,
       clearOfTarget: b.status === 'DROP' ? b.y + b.height < line.y : true,
       audioUnlocked: !!g._mediaUnlocked,
-      fallAudible: !!fall && !fall.muted && fall.volume > 0
+      fallAudible: mixer
+        ? mixer.context.state === 'running'
+        : (!!fall && !fall.muted && fall.volume > 0)
     }
   })
   await page.waitForFunction(() => {
@@ -59,6 +69,9 @@ async function run(rate) {
     const b = g.getInstance('block_' + g.getVariable('BLOCK_COUNT'))
     return b && b.status === 'LAND'
   }, null, { timeout: 5000 })
+  // Let the customer layer consume the landing verdict on its next frame so
+  // the audio/visual synchronization assertion observes the requested mood.
+  await page.waitForTimeout(100)
   const landed = await page.evaluate(() => {
     const g = window.game
     const b = g.getInstance('block_' + g.getVariable('BLOCK_COUNT'))
@@ -67,6 +80,7 @@ async function run(rate) {
     const customer = g.getInstance('customer', 'CUSTOMER_LAYER')
     const watching = customer && customer.videos.watching
     const option = g.getVariable('GAME_USER_OPTION') || {}
+    const mixer = g.appleAudio
     const background = g.getImg('background')
     const videoEntries = customer && customer.videos
       ? Object.keys(customer.videos).filter(mood => !!customer.videos[mood].el).length
@@ -74,13 +88,23 @@ async function run(rate) {
     return {
       gap: Math.abs(b.y - line.y),
       dropElapsed: g.getVariable('GAME_TIME') - b.dropBeganAt,
-      fallPlayed: window.__mobileAudio.fall > 0,
-      landPlayed: window.__mobileAudio.land > 0,
-      landAudible: !!land && !land.muted && land.volume > 0,
+      fallPlayed: mixer
+        ? (mixer.playCounts.fall || 0) > window.__mobileAudio.fall
+        : window.__mobileAudio.fall > 0,
+      landPlayed: mixer
+        ? (mixer.playCounts.land || 0) > window.__mobileAudio.land
+        : window.__mobileAudio.land > 0,
+      landAudible: mixer
+        ? mixer.context.state === 'running'
+        : (!!land && !land.muted && land.volume > 0),
+      mixerPlayCounts: mixer ? { ...mixer.playCounts } : {},
       appleMobile: !!option.appleMobile,
       renderFps: option.renderFps || 60,
       appleTexture: !!(background && (background.currentSrc || background.src).indexOf('-ios.webp') >= 0),
       customerShown: customer ? customer.shown : '',
+      customerMediaStarted: !!(customer && customer.mediaStarted),
+      customerVoiceMatched: !!(mixer && customer && customer.shown
+        && (mixer.playCounts[`customer-${customer.shown}`] || 0) > 0),
       customerVideoEntries: videoEntries,
       customerMode: watching && watching.still ? 'static' : 'video',
       customerReady: watching && watching.still
@@ -121,6 +145,8 @@ async function main() {
       && r.landed.appleTexture
       && r.landed.customerMode === 'static'
       && r.landed.customerVideoEntries === 0
+      && r.landed.customerMediaStarted
+      && r.landed.customerVoiceMatched
       && r.landed.keyInterval === 0
       && r.landed.keyLong === 0))
     && !r.errors.length) && motionStable

@@ -399,7 +399,7 @@ function frameId(video) {
  * on the frame already being drawn. What parking buys is that a reaction never
  * has to REWIND at the moment it is wanted, which is a seek landing exactly on
  * the frame the player is looking at. */
-function makeVideos(performanceMode, appleMobile) {
+function makeVideos(game, performanceMode, appleMobile) {
   const vids = {}
   Object.keys(MOODS).forEach((mood) => {
     const resting = mood === 'watching'
@@ -411,11 +411,23 @@ function makeVideos(performanceMode, appleMobile) {
       const still = new Image()
       still.decoding = 'async'
       still.src = stillUrl(mood)
-      const voice = document.createElement('audio')
-      voice.src = audioUrl(mood)
-      voice.loop = resting
-      voice.preload = 'auto'
-      voice.volume = resting ? VOICE_REST_LEVEL : VOICE_LEVEL
+      let voice
+      if (game.appleAudio) {
+        const mixerName = `customer-${mood}`
+        const volume = resting ? VOICE_REST_LEVEL : VOICE_LEVEL
+        voice = {
+          mixerName,
+          loop: resting,
+          volume,
+          ready: game.appleAudio.register(mixerName, audioUrl(mood), volume)
+        }
+      } else {
+        voice = document.createElement('audio')
+        voice.src = audioUrl(mood)
+        voice.loop = resting
+        voice.preload = 'auto'
+        voice.volume = resting ? VOICE_REST_LEVEL : VOICE_LEVEL
+      }
       vids[mood] = { el: null, voice, keyer: null, still }
       return
     }
@@ -485,10 +497,23 @@ function whenVideosReady(vids, onProgress) {
   const media = []
   Object.keys(vids).forEach((m) => {
     media.push({ el: vids[m].still || vids[m].el, image: !!vids[m].still })
-    media.push({ el: vids[m].voice, image: false })
+    if (vids[m].voice.ready) media.push({ promise: vids[m].voice.ready })
+    else media.push({ el: vids[m].voice, image: false })
   })
   let arrived = 0
   return Promise.all(media.map(item => new Promise((resolve) => {
+    if (item.promise) {
+      item.promise.then(() => {
+        arrived += 1
+        if (onProgress) onProgress(arrived, media.length)
+        resolve()
+      }, () => {
+        arrived += 1
+        if (onProgress) onProgress(arrived, media.length)
+        resolve()
+      })
+      return
+    }
     const v = item.el
     let settled = false
     // One tick per clip whichever way it finishes — ready, broken or timed out.
@@ -531,11 +556,16 @@ function whenVideosReady(vids, onProgress) {
  * from its own tail. */
 function startClipAndVoice(engine, mood, i) {
   const { el, voice } = i.videos[mood]
+  i.mediaStarted = true
   if (el) {
     const p = el.play()
     if (p && p.catch) p.catch(() => {})
   }
   if (!engine.soundOn) return
+  if (voice.mixerName && engine.appleAudio) {
+    engine.appleAudio.play(voice.mixerName, { loop: voice.loop, volume: voice.volume })
+    return
+  }
   try { voice.currentTime = el ? (el.currentTime || 0) : 0 } catch (e) { /* not seekable yet */ }
   // A reaction can start while the first-gesture silent warm-up is resolving.
   // Restore its real level and make that old promise unable to pause the voice.
@@ -544,12 +574,38 @@ function startClipAndVoice(engine, mood, i) {
   if (q && q.catch) q.catch(() => {})
 }
 
+/* Put every customer timeline back behind the gameplay gate. This is broader
+ * than stopVoice(): if a menu/home transition happens while a reaction is
+ * active, no hidden video decoder or queued Apple voice is allowed to carry on
+ * until the next run. */
+function stopAllCustomerMedia(engine, i) {
+  Object.keys(i.videos || {}).forEach((mood) => {
+    const { el, voice } = i.videos[mood]
+    if (el) {
+      el.pause()
+      if (mood !== 'watching') {
+        try { el.currentTime = 0 } catch (e) { /* not seekable yet */ }
+      }
+    }
+    if (voice.mixerName && engine.appleAudio) engine.appleAudio.stop(voice.mixerName)
+    else {
+      voice.pause()
+      try { voice.currentTime = 0 } catch (e) { /* not seekable yet */ }
+    }
+  })
+  i.mediaStarted = false
+}
+
 /* Silence whichever voice is on screen. Called on every mood change, before the
  * incoming one starts — including when the outgoing mood is watching, whose bed
  * must get out of the way of a reaction rather than play underneath it. */
 function stopVoice(engine, i) {
   const cur = i.videos[i.shown]
   if (!cur) return
+  if (cur.voice.mixerName && engine.appleAudio) {
+    engine.appleAudio.stop(cur.voice.mixerName)
+    return
+  }
   cur.voice.pause()
   try { cur.voice.currentTime = 0 } catch (e) { /* not seekable yet */ }
 }
@@ -582,6 +638,7 @@ function resyncVoice(engine, i, mood) {
 const customerAction = (instance, engine, time) => {
   const i = instance
   if (!engine.getVariable(constant.gameStartNow, false)) {
+    if (i.mediaStarted) stopAllCustomerMedia(engine, i)
     i.ready = false
     return
   }
@@ -726,9 +783,12 @@ const customerAction = (instance, engine, time) => {
        * browser that has not read the metadata yet; every real answer here
        * comes from the file. */
       const durationSource = next.el || next.voice
-      const dur = (durationSource.duration && isFinite(durationSource.duration))
+      const mixerDuration = next.voice.mixerName && engine.appleAudio
+        ? engine.appleAudio.duration(next.voice.mixerName)
+        : 0
+      const dur = mixerDuration || ((durationSource.duration && isFinite(durationSource.duration))
         ? durationSource.duration
-        : REACTION_FALLBACK
+        : REACTION_FALLBACK)
       i.until = time + (dur * 1000)
     }
   }
@@ -797,7 +857,7 @@ export const addCustomer = (game, onProgress) => {
    * The returned promise is what the page waits on; see the loading gate in
    * index.html / index-blink.html. */
   const gameOption = game.getVariable(constant.gameUserOption) || {}
-  const videos = makeVideos(!!gameOption.performanceMode, !!gameOption.appleMobile)
+  const videos = makeVideos(game, !!gameOption.performanceMode, !!gameOption.appleMobile)
   const customer = new Instance({
     name: 'customer',
     action: customerAction,

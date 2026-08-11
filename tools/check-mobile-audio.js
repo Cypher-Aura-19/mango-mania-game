@@ -28,21 +28,55 @@ async function main() {
   page.on('pageerror', error => errors.push(String(error)))
   await page.goto(BASE, { waitUntil: 'load' })
   await page.waitForSelector('#start:not(.hide)', { timeout: 45000 })
-  await page.evaluate(() => {
+  const beforeTap = await page.evaluate(() => {
     window.__audioProbe = { bgmPlay: 0, bgmPause: 0, overPlay: 0 }
+    if (window.game.appleAudio) {
+      return {
+        mixer: true,
+        context: window.game.appleAudio.context.state,
+        playCounts: { ...window.game.appleAudio.playCounts }
+      }
+    }
     const bgm = window.game.getAudio('bgm')
     const over = window.game.getAudio('game-over')
     bgm.addEventListener('play', () => { window.__audioProbe.bgmPlay += 1 })
     bgm.addEventListener('pause', () => { window.__audioProbe.bgmPause += 1 })
     over.addEventListener('play', () => { window.__audioProbe.overPlay += 1 })
+    return { mixer: false }
   })
 
   await page.tap('#start')
-  await page.waitForFunction(() => {
-    const audio = window.game.getAudio('bgm')
-    return audio && !audio.paused && !audio.muted && audio.volume > 0
-  }, null, { timeout: 5000 })
+  await page.waitForFunction((ios) => {
+    if (ios) {
+      const mixer = window.game.appleAudio
+      return mixer && mixer.context.state === 'running' && mixer.isPlaying('bgm')
+    }
+    const bgm = window.game.getAudio('bgm')
+    return bgm && !bgm.paused && !bgm.muted && bgm.volume > 0
+  }, IOS, { timeout: 5000 })
   await page.waitForTimeout(350)
+
+  // At this point the player is still on the menu. On iOS the only sound that
+  // may have started is BGM: this catches the old audible "silent warm-up" of
+  // every landing and customer reaction sound.
+  const menuState = await page.evaluate(() => {
+    const mixer = window.game.appleAudio
+    if (!mixer) return null
+    const customer = window.game.getInstance('customer', 'CUSTOMER_LAYER')
+    const playCounts = { ...mixer.playCounts }
+    // The launch button has its own intentional click tick. Effects, game-over,
+    // and customer voices must remain untouched until gameplay asks for them.
+    const leaked = Object.keys(playCounts)
+      .filter(name => name !== 'bgm' && name !== 'click' && playCounts[name] > 0)
+    return {
+      playCounts,
+      leaked,
+      customerMediaStarted: !!(customer && customer.mediaStarted),
+      customerVideoElements: customer && customer.videos
+        ? Object.keys(customer.videos).filter(mood => !!customer.videos[mood].el).length
+        : -1
+    }
+  })
 
   // Invoke the exact game-over audio sequence from a trusted gesture.
   await page.evaluate(() => {
@@ -56,21 +90,33 @@ async function main() {
     document.body.appendChild(button)
   })
   await page.tap('#audio-probe-over')
-  await page.waitForFunction(() => {
+  await page.waitForFunction((ios) => {
+    if (ios) {
+      const mixer = window.game.appleAudio
+      return mixer && (mixer.playCounts['game-over'] || 0) > 0 && mixer.isPlaying('game-over')
+    }
     const audio = window.game.getAudio('game-over')
-    // First play is the silent unlock warm-up; the second is the real cue.
+    // First play is the non-Apple silent unlock warm-up; the second is the cue.
     return window.__audioProbe.overPlay > 1 && audio && !audio.paused && !audio.muted && audio.volume > 0
-  }, null, { timeout: 5000 })
+  }, IOS, { timeout: 5000 })
 
   const result = await page.evaluate(() => {
+    const mixer = window.game.appleAudio
     const bgm = window.game.getAudio('bgm')
     const over = window.game.getAudio('game-over')
     return {
       events: window.__audioProbe,
       unlocked: !!window.game._mediaUnlocked,
-      bgmAudibleBeforeOver: window.__audioProbe.bgmPlay > 0,
-      bgmStoppedForOver: bgm.paused,
-      overAudible: !over.paused && !over.muted && over.volume > 0,
+      mixer: !!mixer,
+      mixerState: mixer ? mixer.context.state : '',
+      mixerPlayCounts: mixer ? { ...mixer.playCounts } : {},
+      bgmAudibleBeforeOver: mixer
+        ? (mixer.playCounts.bgm || 0) > 0
+        : window.__audioProbe.bgmPlay > 0,
+      bgmStoppedForOver: mixer ? !mixer.isPlaying('bgm') : bgm.paused,
+      overAudible: mixer
+        ? mixer.isPlaying('game-over')
+        : (!over.paused && !over.muted && over.volume > 0),
       bgmReady: bgm.readyState,
       overReady: over.readyState,
       appleMobile: !!(window.game.getVariable('GAME_USER_OPTION') || {}).appleMobile
@@ -82,10 +128,19 @@ async function main() {
     && result.bgmAudibleBeforeOver
     && result.bgmStoppedForOver
     && result.overAudible
-    && result.events.overPlay > 1
-    && (!IOS || result.appleMobile)
+    && (IOS
+      ? (result.appleMobile
+        && beforeTap.mixer
+        && Object.keys(beforeTap.playCounts).every(name => name === 'bgm')
+        && menuState
+        && menuState.leaked.length === 0
+        && !menuState.customerMediaStarted
+        && menuState.customerVideoElements === 0
+        && result.mixerState === 'running'
+        && result.mixerPlayCounts['game-over'] > 0)
+      : result.events.overPlay > 1)
     && errors.length === 0
-  console.log(JSON.stringify({ mode: IOS ? 'ios' : 'android', result, errors }, null, 2))
+  console.log(JSON.stringify({ mode: IOS ? 'ios' : 'android', beforeTap, menuState, result, errors }, null, 2))
   console.log(ok ? 'PASS' : 'FAIL')
   process.exit(ok ? 0 : 1)
 }

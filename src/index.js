@@ -5,6 +5,7 @@ import { lineAction, linePainter } from './line'
 import { hookAction, hookPainter } from './hook'
 import { tutorialAction, tutorialPainter } from './tutorial'
 import { addCustomer } from './customer'
+import { createAppleAudio } from './appleAudio'
 import * as constant from './constant'
 import { startAnimate, endAnimate } from './animateFuncs'
 import { prepareBlockTextures } from './block'
@@ -206,8 +207,25 @@ window.TowerGame = (option = {}) => {
   }
   Object.keys(levels).forEach((name) => {
     const audio = game.getAudio(name)
-    if (audio) audio.volume = levels[name]
+    if (audio) {
+      audio.volume = levels[name]
+      audio._gameLevel = levels[name]
+    }
   })
+  /* Route every Apple sound through one Web Audio context. iOS does not provide
+   * dependable per-element volume control and competing HTML audio elements are
+   * exactly what leaked landing/reaction sounds onto the menu and displaced the
+   * BGM. Capture their URLs, decode them once, then release the native elements. */
+  game.appleAudio = appleMobile ? createAppleAudio() : null
+  if (game.appleAudio) {
+    Object.keys(game.assetsObj.audio).forEach((name) => {
+      const audio = game.assetsObj.audio[name]
+      const url = audio.currentSrc || audio.src
+      game.appleAudio.register(name, url, audio._gameLevel === undefined ? 1 : audio._gameLevel)
+      audio.pause()
+      audio.preload = 'none'
+    })
+  }
   /* The canvas is as wide as the window; the tower is stacked in a centred
    * portrait column of it. The page passes the column width in CSS pixels —
    * fall back to the whole canvas so a portrait screen, where the two are the
@@ -265,6 +283,11 @@ window.TowerGame = (option = {}) => {
   game.playAudio = (name, loop = false) => {
     if (!game.soundOn) return Promise.resolve(false)
     const audio = game.getAudio(name)
+    if (game.appleAudio) {
+      if (name === 'bgm') game._bgmWanted = true
+      const volume = audio && audio._gameLevel !== undefined ? audio._gameLevel : 1
+      return Promise.resolve(game.appleAudio.play(name, { loop, volume }))
+    }
     if (!audio) return Promise.resolve(false)
     if (name === 'bgm') game._bgmWanted = true
     if (audio._cancelWarm) audio._cancelWarm()
@@ -295,6 +318,10 @@ window.TowerGame = (option = {}) => {
   }
   game.pauseAudio = (name) => {
     if (name === 'bgm') game._bgmWanted = false
+    if (game.appleAudio) {
+      game.appleAudio.stop(name)
+      return
+    }
     enginePauseAudio(name)
   }
 
@@ -309,6 +336,14 @@ window.TowerGame = (option = {}) => {
     if (nav.userActivation && !nav.userActivation.isActive) return
     const firstUnlock = !game._mediaUnlocked
     game._mediaUnlocked = true
+    if (game.appleAudio) {
+      // resume() is invoked synchronously from the trusted gesture. No real
+      // effect is played as an unlock token, so the menu can only start BGM.
+      game.appleAudio.unlock().then(() => {
+        if (game._bgmWanted && !game.appleAudio.isPlaying('bgm')) game.playBgm()
+      })
+      return
+    }
     // playBgm() may already have failed outside a gesture; this call is inside
     // the gesture and is the authoritative start. Never pause it below.
     game.playBgm()
@@ -391,7 +426,12 @@ window.TowerGame = (option = {}) => {
   // Mobile browsers can suspend media when switching apps or opening camera
   // permission UI. Resume the requested music when the page becomes active.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && game._mediaUnlocked && game._bgmWanted) game.playBgm()
+    if (!document.hidden && game._mediaUnlocked && game._bgmWanted) {
+      game.playBgm()
+      // Once Safari has been gesture-unlocked it normally permits a resume on
+      // foregrounding. If it does not, playBgm remains queued for the next tap.
+      if (game.appleAudio) game.appleAudio.unlock()
+    }
   })
 
   /* The page's buttons live in the DOM, not in the engine, so they get a hook
