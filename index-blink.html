@@ -517,7 +517,7 @@
   <div id="blinkDot" class="connecting"></div>
 
   <!-- Tower game bundle (exposes window.TowerGame) -->
-  <script src="./dist/main.js?v=20260811-audio-assets"></script>
+  <script src="./dist/main.js?v=20260811-ios-static"></script>
 
   <!-- Global leaderboard client (exposes window.MangoBoard) -->
   <script src="./assets/leaderboard-client.js"></script>
@@ -543,9 +543,9 @@
   const BLINK_COOLDOWN_MS = 300;
   const APPLE_MOBILE = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     ((navigator.platform === 'MacIntel' || navigator.platform === 'Macintosh') && navigator.maxTouchPoints > 1);
-  // iOS shares a tighter graphics budget between camera inference, video and
-  // canvas. 15Hz still samples a normal blink multiple times; others keep 20Hz.
-  const DETECT_INTERVAL_MS = 1000 / (APPLE_MOBILE ? 15 : 20);
+  // iOS shares a tighter graphics budget between camera inference and canvas.
+  // 12Hz still samples a normal blink while leaving regular main-thread slots.
+  const DETECT_INTERVAL_MS = 1000 / (APPLE_MOBILE ? 12 : 20);
 
   /* ============================================================
      DOM REFS
@@ -926,7 +926,16 @@
   // and ships it to the Web Worker. ALL MediaPipe inference happens off-thread,
   // so the game's render loop is never blocked — smooth as the tap version.
   function detectTick() {
-    if (blinkReady && !frameInFlight && video.readyState >= 2 && !video.paused) {
+    /* Once a block has been released, another blink cannot do useful work until
+     * the next block is swinging. Stop camera bitmap uploads/inference during
+     * DROP/LAND/TIP, exactly when gameplay animation needs the budget most. */
+    let useful = true;
+    if (runStarted && game) {
+      const count = game.getVariable('BLOCK_COUNT');
+      const block = game.getInstance('block_' + count);
+      useful = !block || block.status === 'SWING';
+    }
+    if (useful && blinkReady && !frameInFlight && video.readyState >= 2 && !video.paused) {
       // createImageBitmap is GPU-backed and cheap; the bitmap is transferred
       // (zero-copy) to the worker, which owns it and closes it after inference.
       createImageBitmap(video).then((bitmap) => {

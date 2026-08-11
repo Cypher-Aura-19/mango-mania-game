@@ -50,9 +50,41 @@ window.TowerGame = (option = {}) => {
     height,
     soundOn
   })
-  // Vercel serves assets as immutable for a year. Rev the URL so returning
-  // phones receive the resized sprites instead of their cached print versions.
-  const pathGenerator = (path) => `./assets/${path}?v=20260811-audio-assets`
+  /* iOS uses a 1x canvas, so decoding desktop-size textures only burns WebKit's
+   * memory budget. These variants cover the largest possible iPad play column
+   * while cutting the active texture set substantially. Android/desktop retain
+   * their existing assets and visual path. */
+  const appleTexture = new Set([
+    'background.webp', 'game-bg-1.webp', 'game-bg-2.webp', 'game-bg-3.webp',
+    'block.webp', 'block-rope.webp',
+    'c4.webp', 'c5.webp', 'c6.webp', 'c7.webp', 'c8.webp',
+    'f1.webp', 'f4.webp', 'f6.webp'
+  ])
+  const pathGenerator = (path) => {
+    const resolved = appleMobile && appleTexture.has(path)
+      ? path.replace(/\.webp$/, '-ios.webp')
+      : path
+    return `./assets/${resolved}?v=20260811-ios-static`
+  }
+
+  /* A stable 30fps is preferable to WebKit oscillating between 60 and long
+   * stalls. Physics reads timestamps, so skipped paints do not change gravity,
+   * landing height, or game speed. This also leaves regular main-thread slots
+   * for touch/audio and (in blink mode) camera inference. */
+  if (appleMobile) {
+    option.renderFps = 30
+    const engineAnimate = game.animate.bind(game)
+    const minFrame = 1000 / option.renderFps
+    let lastFrame = -Infinity
+    game.animate = (time) => {
+      if (time - lastFrame < minFrame - 1) {
+        window.requestAnimationFrame(game.animate)
+        return
+      }
+      lastFrame = time
+      engineAnimate(time)
+    }
+  }
 
   game.addImg('background', pathGenerator('background.webp'))
   game.addImg('gamebg', pathGenerator('game-bg-1.webp'))

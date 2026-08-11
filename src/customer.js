@@ -142,6 +142,7 @@ const clipUrl = (mood, appleMobile) => {
  * own <audio>, held in lockstep: rewound to zero and started on the same frame
  * the clip starts, paused and rewound the moment the clip hands back. */
 const audioUrl = (mood) => `./assets/${MOODS[mood]}.mp3`
+const stillUrl = (mood) => `./assets/customer-${MOODS[mood]}-ios.webp?v=20260811-ios-static`
 
 // Exponential ease toward a target that stays stable across frame rates.
 const ease = (current, target, rate, dt) =>
@@ -402,6 +403,22 @@ function makeVideos(performanceMode, appleMobile) {
   const vids = {}
   Object.keys(MOODS).forEach((mood) => {
     const resting = mood === 'watching'
+    /* On iOS, never create a video decoder at all. WebKit makes canvas reads
+     * from video synchronous with the main thread; even a tiny 6fps keyer can
+     * block the hook/game loop. Pre-keyed stills keep every mood and its voice
+     * while making the per-frame customer cost one ordinary drawImage. */
+    if (appleMobile) {
+      const still = new Image()
+      still.decoding = 'async'
+      still.src = stillUrl(mood)
+      const voice = document.createElement('audio')
+      voice.src = audioUrl(mood)
+      voice.loop = resting
+      voice.preload = 'auto'
+      voice.volume = resting ? VOICE_REST_LEVEL : VOICE_LEVEL
+      vids[mood] = { el: null, voice, keyer: null, still }
+      return
+    }
     const v = document.createElement('video')
     v.src = clipUrl(mood, appleMobile)
     v.muted = true
@@ -467,11 +484,12 @@ function whenVideosReady(vids, onProgress) {
    * a few floors of the start. Six items, one bar. */
   const media = []
   Object.keys(vids).forEach((m) => {
-    media.push(vids[m].el)
-    media.push(vids[m].voice)
+    media.push({ el: vids[m].still || vids[m].el, image: !!vids[m].still })
+    media.push({ el: vids[m].voice, image: false })
   })
   let arrived = 0
-  return Promise.all(media.map(v => new Promise((resolve) => {
+  return Promise.all(media.map(item => new Promise((resolve) => {
+    const v = item.el
     let settled = false
     // One tick per clip whichever way it finishes — ready, broken or timed out.
     // Without the guard the timeout would count a clip that already arrived and
@@ -479,14 +497,14 @@ function whenVideosReady(vids, onProgress) {
     const done = () => {
       if (settled) return
       settled = true
-      v.removeEventListener('canplay', done)
+      v.removeEventListener(item.image ? 'load' : 'canplay', done)
       v.removeEventListener('error', done)
       arrived += 1
       if (onProgress) onProgress(arrived, media.length)
       resolve()
     }
-    if (v.readyState >= 3) { done(); return }
-    v.addEventListener('canplay', done)
+    if (item.image ? (v.complete && v.naturalWidth > 0) : v.readyState >= 3) { done(); return }
+    v.addEventListener(item.image ? 'load' : 'canplay', done)
     v.addEventListener('error', done)
     setTimeout(done, 6000)
   })))
@@ -513,10 +531,12 @@ function whenVideosReady(vids, onProgress) {
  * from its own tail. */
 function startClipAndVoice(engine, mood, i) {
   const { el, voice } = i.videos[mood]
-  const p = el.play()
-  if (p && p.catch) p.catch(() => {})
+  if (el) {
+    const p = el.play()
+    if (p && p.catch) p.catch(() => {})
+  }
   if (!engine.soundOn) return
-  try { voice.currentTime = el.currentTime || 0 } catch (e) { /* not seekable yet */ }
+  try { voice.currentTime = el ? (el.currentTime || 0) : 0 } catch (e) { /* not seekable yet */ }
   // A reaction can start while the first-gesture silent warm-up is resolving.
   // Restore its real level and make that old promise unable to pause the voice.
   if (voice._cancelWarm) voice._cancelWarm()
@@ -545,6 +565,7 @@ function stopVoice(engine, i) {
 function resyncVoice(engine, i, mood) {
   if (!engine.soundOn) return
   const { el, voice } = i.videos[mood]
+  if (!el) return
   if (voice.paused || el.paused) return
   if (!voice.duration || !isFinite(voice.duration)) return
   /* Modulo the clip length, so the instant one of the pair has looped and the
@@ -617,13 +638,16 @@ const customerAction = (instance, engine, time) => {
 
   // Correct the box to the clip's real aspect, once it is known.
   if (!i.fitted) {
-    const el = i.videos.watching.el
-    if (el.videoWidth && el.videoHeight) {
+    const watching = i.videos.watching
+    const source = watching.still || watching.el
+    const sourceWidth = watching.still ? source.naturalWidth : source.videoWidth
+    const sourceHeight = watching.still ? source.naturalHeight : source.videoHeight
+    if (sourceWidth && sourceHeight) {
       const colW = pw(engine)
-      const scale = Math.min((colW * BOX_W) / el.videoWidth,
-        (colW * BOX_H) / el.videoHeight)
-      i.w = el.videoWidth * scale
-      i.h = el.videoHeight * scale
+      const scale = Math.min((colW * BOX_W) / sourceWidth,
+        (colW * BOX_H) / sourceHeight)
+      i.w = sourceWidth * scale
+      i.h = sourceHeight * scale
       i.fitted = true
     }
   }
@@ -639,7 +663,7 @@ const customerAction = (instance, engine, time) => {
    * started, and `ended` covers the case where it finished early or the timer
    * and the decoder disagree. */
   let want = i.shown
-  if (want !== 'watching' && (time >= i.until || (playing && playing.el.ended))) {
+  if (want !== 'watching' && (time >= i.until || (playing && playing.el && playing.el.ended))) {
     want = 'watching'
   }
 
@@ -661,7 +685,10 @@ const customerAction = (instance, engine, time) => {
    * live keyers is the one version of this that drops frames. */
   if (want !== i.shown) {
     const from = i.videos[i.shown]
-    if (from && from.keyer.ready) {
+    if (from && from.still) {
+      i.snap = from.still
+      i.fade = 0
+    } else if (from && from.keyer && from.keyer.ready) {
       if (!i.snap) i.snap = document.createElement('canvas')
       if (i.snap.width !== from.keyer.w || i.snap.height !== from.keyer.h) {
         i.snap.width = from.keyer.w
@@ -678,7 +705,7 @@ const customerAction = (instance, engine, time) => {
     // silence its voice on the same frame so a cut-short reaction does not go on
     // talking underneath the one that replaced it.
     stopVoice(engine, i)
-    if (from) {
+    if (from && from.el) {
       // Only the visible clip decodes. Leaving the watching loop running behind
       // every reaction made phones decode two videos while also keying one.
       from.el.pause()
@@ -698,8 +725,9 @@ const customerAction = (instance, engine, time) => {
       /* Run for as long as the clip actually is. The fallback is only for a
        * browser that has not read the metadata yet; every real answer here
        * comes from the file. */
-      const dur = (next.el.duration && isFinite(next.el.duration))
-        ? next.el.duration
+      const durationSource = next.el || next.voice
+      const dur = (durationSource.duration && isFinite(durationSource.duration))
+        ? durationSource.duration
         : REACTION_FALLBACK
       i.until = time + (dur * 1000)
     }
@@ -716,7 +744,7 @@ const customerAction = (instance, engine, time) => {
 
   // Key the drawn clip, but only when it has a new frame to key.
   const cur = i.videos[i.shown]
-  if (cur && cur.el.readyState >= 2 && cur.el.videoWidth) {
+  if (cur && cur.el && cur.el.readyState >= 2 && cur.el.videoWidth) {
     if (!cur.keyer.ready) sizeKeyer(cur.keyer, cur.el.videoWidth, cur.el.videoHeight)
     // Check the decoder frame only when the keyer's own budget allows work.
     // getVideoPlaybackQuality plus getImageData on every rAF was enough to stall
@@ -741,7 +769,8 @@ const customerPainter = (instance, engine) => {
   // gameplay frame lingers on the menu screen.
   if (!engine.getVariable(constant.gameStartNow, false)) return
   const cur = i.videos && i.videos[i.shown]
-  if (!cur || !cur.keyer.ready) return
+  const source = cur && (cur.still || (cur.keyer && cur.keyer.ready ? cur.keyer.out : null))
+  if (!source) return
   const { ctx } = engine
   const y = i.y + (i.bob || 0)
   // The outgoing frame underneath, fading; the incoming one over it, coming up.
@@ -755,7 +784,7 @@ const customerPainter = (instance, engine) => {
   }
   ctx.save()
   if (i.fade < 1) ctx.globalAlpha = i.fade
-  ctx.drawImage(cur.keyer.out, i.x, y, i.w, i.h)
+  ctx.drawImage(source, i.x, y, i.w, i.h)
   ctx.restore()
 }
 
@@ -779,6 +808,6 @@ export const addCustomer = (game, onProgress) => {
   return whenVideosReady(videos, onProgress).then(() => {
     // Its first frame is decoded for instant start; do not spend battery
     // decoding the watching loop underneath the menu screens.
-    videos.watching.el.pause()
+    if (videos.watching.el) videos.watching.el.pause()
   })
 }

@@ -67,6 +67,10 @@ async function run(rate) {
     const customer = g.getInstance('customer', 'CUSTOMER_LAYER')
     const watching = customer && customer.videos.watching
     const option = g.getVariable('GAME_USER_OPTION') || {}
+    const background = g.getImg('background')
+    const videoEntries = customer && customer.videos
+      ? Object.keys(customer.videos).filter(mood => !!customer.videos[mood].el).length
+      : -1
     return {
       gap: Math.abs(b.y - line.y),
       dropElapsed: g.getVariable('GAME_TIME') - b.dropBeganAt,
@@ -74,9 +78,18 @@ async function run(rate) {
       landPlayed: window.__mobileAudio.land > 0,
       landAudible: !!land && !land.muted && land.volume > 0,
       appleMobile: !!option.appleMobile,
-      customerCodec: watching ? (watching.el.currentSrc || watching.el.src).split('.').pop() : '',
-      keyInterval: watching ? Math.round(watching.keyer.keyInterval) : 0,
-      keyLong: watching ? watching.keyer.keyedLong : 0
+      renderFps: option.renderFps || 60,
+      appleTexture: !!(background && (background.currentSrc || background.src).indexOf('-ios.webp') >= 0),
+      customerShown: customer ? customer.shown : '',
+      customerVideoEntries: videoEntries,
+      customerMode: watching && watching.still ? 'static' : 'video',
+      customerReady: watching && watching.still
+        ? (watching.still.complete && watching.still.naturalWidth > 0)
+        : !!(watching && watching.el && watching.el.readyState >= 2),
+      customerCodec: watching && watching.el
+        ? (watching.el.currentSrc || watching.el.src).split('.').pop() : '',
+      keyInterval: watching && watching.keyer ? Math.round(watching.keyer.keyInterval) : 0,
+      keyLong: watching && watching.keyer ? watching.keyer.keyedLong : 0
     }
   })
   const duration = Date.now() - started
@@ -102,10 +115,14 @@ async function main() {
     && r.landed.fallPlayed
     && r.landed.landPlayed
     && r.landed.landAudible
+    && r.landed.customerReady
     && (!IOS || (r.landed.appleMobile
-      && r.landed.customerCodec.indexOf('mp4') === 0
-      && r.landed.keyInterval >= 160
-      && r.landed.keyLong === 144))
+      && r.landed.renderFps === 30
+      && r.landed.appleTexture
+      && r.landed.customerMode === 'static'
+      && r.landed.customerVideoEntries === 0
+      && r.landed.keyInterval === 0
+      && r.landed.keyLong === 0))
     && !r.errors.length) && motionStable
   console.log('frame-time stable:', motionStable)
   console.log(ok ? 'PASS' : 'FAIL')
