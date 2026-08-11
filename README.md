@@ -28,6 +28,19 @@ npm start
 - **Play:** http://localhost:8082
 - **Blink edition:** http://localhost:8082/blink
 
+## Resetting the leaderboard
+
+Pull the production environment variables once, then run the guarded reset:
+
+```bash
+vercel env pull .env.local
+npm run leaderboard:reset -- --yes
+```
+
+Running `npm run leaderboard:reset` without `--yes` only prints the target and
+current row counts. A confirmed reset permanently deletes all score and player
+rows from the configured hosted leaderboard.
+
 ## Tech Stack
 
 | Layer | Tool |
