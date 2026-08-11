@@ -562,9 +562,11 @@
   const BLINK_COOLDOWN_MS = 300;
   const APPLE_MOBILE = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     ((navigator.platform === 'MacIntel' || navigator.platform === 'Macintosh') && navigator.maxTouchPoints > 1);
+  const PHONE_CAPTURE = APPLE_MOBILE || (navigator.maxTouchPoints > 0 &&
+    window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   // iOS shares a tighter graphics budget between camera inference and canvas.
   // 12Hz still samples a normal blink while leaving regular main-thread slots.
-  const DETECT_INTERVAL_MS = 1000 / (APPLE_MOBILE ? 12 : 20);
+  const DETECT_INTERVAL_MS = 1000 / (PHONE_CAPTURE ? 12 : 20);
 
   /* ============================================================
      DOM REFS
@@ -580,6 +582,22 @@
   const loadDetail  = document.getElementById('loadDetail');
   const loadWarn    = document.getElementById('loadWarn');
   const blinkDot    = document.getElementById('blinkDot');
+
+  /* WebKit has shipped versions where createImageBitmap(video) succeeds but
+   * returns unusable pixels. Normalising the phone camera through a tiny canvas
+   * avoids that path and also bakes the camera's orientation into the frame.
+   * Desktop keeps the faster direct-video transfer. */
+  const captureCanvas = document.createElement('canvas');
+  captureCanvas.width = 320;
+  captureCanvas.height = 240;
+  const captureContext = captureCanvas.getContext('2d', { alpha: false });
+  const blinkDebug = {
+    captureMode: PHONE_CAPTURE ? 'canvas' : 'video',
+    cameraSize: '', captureAttempts: 0, framesSent: 0, results: 0,
+    faces: 0, captureErrors: 0, inferenceErrors: 0, lastError: ''
+  };
+  // Read-only troubleshooting hook for Safari remote inspection.
+  window.__blinkDebug = blinkDebug;
 
   // Audio unlock state - see unlockAudio() below.
   let audioUnlocked = false;
@@ -960,12 +978,33 @@
       useful = !block || block.status === 'SWING';
     }
     if (useful && blinkReady && !frameInFlight && video.readyState >= 2 && !video.paused) {
-      // createImageBitmap is GPU-backed and cheap; the bitmap is transferred
-      // (zero-copy) to the worker, which owns it and closes it after inference.
-      createImageBitmap(video).then((bitmap) => {
-        frameInFlight = true;
+      /* Lock before conversion. On a slow phone, locking inside .then() allowed
+       * several conversions to queue during the same inference and eventually
+       * flooded the worker with stale frames. */
+      frameInFlight = true;
+      blinkDebug.captureAttempts += 1;
+
+      let framePromise;
+      try {
+        if (PHONE_CAPTURE && captureContext) {
+          captureContext.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+          framePromise = createImageBitmap(captureCanvas);
+        } else {
+          framePromise = createImageBitmap(video);
+        }
+      } catch (err) {
+        framePromise = Promise.reject(err);
+      }
+
+      framePromise.then((bitmap) => {
+        blinkDebug.framesSent += 1;
         blinkWorker.postMessage({ type: 'frame', bitmap, ts: performance.now() }, [bitmap]);
-      }).catch(() => { /* frame not ready this tick */ });
+      }).catch((err) => {
+        frameInFlight = false;
+        blinkDebug.captureErrors += 1;
+        blinkDebug.lastError = String(err && (err.message || err));
+        console.warn('[Blink] Camera frame capture failed:', err);
+      });
     }
     setTimeout(detectTick, DETECT_INTERVAL_MS);
   }
@@ -994,8 +1033,14 @@
     }
     if (msg.type === 'result') {
       frameInFlight = false;
+      blinkDebug.results += 1;
+      if (msg.frameError) {
+        blinkDebug.inferenceErrors += 1;
+        blinkDebug.lastError = msg.frameError;
+      }
       const now = performance.now();
       if (msg.face) {
+        blinkDebug.faces += 1;
         lastFaceSeenTime = now;
         setDot('active pulse');
         processEar(msg.avgEar, now);
@@ -1020,6 +1065,14 @@
     });
     video.srcObject = stream;
     await video.play();
+    /* Preserve the real stream aspect ratio. Portrait phones often ignore the
+     * requested 4:3 dimensions; stretching those frames hurts face detection. */
+    const sourceWidth = video.videoWidth || 320;
+    const sourceHeight = video.videoHeight || 240;
+    const scale = Math.min(1, 320 / sourceWidth, 240 / sourceHeight);
+    captureCanvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    captureCanvas.height = Math.max(1, Math.round(sourceHeight * scale));
+    blinkDebug.cameraSize = sourceWidth + 'x' + sourceHeight;
     cameraOk = true;
     // Camera permission grant is a user gesture -> unlocks autoplay sound.
     unlockAudio();
@@ -1115,7 +1168,7 @@
         if (msg.type !== 'frame') return;
         const { bitmap, ts } = msg;
         if (!landmarker) { bitmap.close(); self.postMessage({ type: 'result', face: false }); return; }
-        let face = false, avgEar = 1;
+        let face = false, avgEar = 1, frameError = '';
         try {
           const t = ts <= lastTs ? lastTs + 1 : ts;
           lastTs = t;
@@ -1125,9 +1178,9 @@
             avgEar = (ear(lm, LEFT_EYE) + ear(lm, RIGHT_EYE)) / 2;
             face = true;
           }
-        } catch (err) { /* skip frame */ }
+        } catch (err) { frameError = String(err && (err.message || err)); }
         bitmap.close();
-        self.postMessage({ type: 'result', face, avgEar });
+        self.postMessage({ type: 'result', face, avgEar, frameError });
       };
 
       init().catch((err) => self.postMessage({ type: 'error', message: String(err) }));
