@@ -202,26 +202,11 @@ const strokeJagEdge = (engine, instance, cutSide) => {
   ctx.restore()
 }
 
-const checkCollision = (block, line) => {
-  // 0 goon 1 drop 2 rotate left 3 rotate right 4 ok 5 perfect
-  if (block.y + block.height >= line.y) {
-    if (block.x < line.x - block.calWidth || block.x > line.collisionX + block.calWidth) {
-      return 1
-    }
-    if (block.x < line.x) {
-      return 2
-    }
-    if (block.x > line.collisionX) {
-      return 3
-    }
-    if (block.x > line.x + (block.calWidth * 0.8) && block.x < line.x + (block.calWidth * 1.2)) {
-      // -10% +10%
-      return 5
-    }
-    return 4
-  }
-  return 0
-}
+// Collision classification used to decide that a block whose LEFT EDGE sat
+// around the MIDDLE of the tower was "perfect". That is a 40-60% overhang, so
+// it bypassed clipping. Vertical contact is the only answer needed here; the
+// measured intersection below is the authority for miss, cut, and perfect.
+const reachedLandingPlane = (block, line) => block.y + block.height >= line.y
 /* The rope creaks at the ENDS of the swing, not continuously.
  *
  * A held loop would have been the obvious thing and it is the wrong thing twice
@@ -531,10 +516,9 @@ export const blockAction = (instance, engine, time) => {
       i.startDropTime = time
       i.y += (i.vy * deltaTime) + (0.5 * i.ay * (deltaTime ** 2))
       i.vy += i.ay * deltaTime
-      const collision = checkCollision(instance, line)
       // Horizontal overlap is not a landing. Until the cake's bottom actually
       // reaches the tower, keep falling and do not enter scoring/clipping logic.
-      if (collision === 0) break
+      if (!reachedLandingPlane(instance, line)) break
       const blockY = line.y - instance.height
       // Capture the ORIGINAL block left edge now — applyLand() mutates
       // instance.x, so it must not be read after the stack happens.
@@ -549,6 +533,13 @@ export const blockAction = (instance, engine, time) => {
       const overlapLeft = Math.max(blockLeft, line.x)
       const overlapRight = Math.min(blockRight, line.collisionX)
       const overlapWidth = overlapRight - overlapLeft
+      const leftCut = Math.max(0, overlapLeft - blockLeft)
+      const rightCut = Math.max(0, blockRight - overlapRight)
+      // Ignore only sub-pixel drift from canvas rounding. Any overhang a player
+      // can actually see must be clipped; there is no multi-pixel grace window.
+      const alignmentTolerance = engine.highResolution ? 2 : 1
+      const aligned = leftCut <= alignmentTolerance && rightCut <= alignmentTolerance
+      const isFirstBlock = engine.getVariable(constant.successCount, 0) === 0
       // The block must land with at least 20% of itself resting on the tower.
       // If more than 80% hangs off the edge, it can't balance.
       const minOverlap = instance.width * 0.20
@@ -563,84 +554,62 @@ export const blockAction = (instance, engine, time) => {
         instance.y = blockY
         i.tipDir = (blockLeft + instance.width / 2) > ((line.x + line.collisionX) / 2) ? 1 : -1
         i.tipRig = false
-      } else if (collision === 5) {
-        // perfect: full-width stack, no clip, and the normal bonus
+      } else if (aligned) {
+        // Full geometric overlap. The first floor is the starting platform, so
+        // it lands whole but does not receive an automatic perfect-chain bonus.
         i.status = constant.land
         instance.y = blockY
         applyLand(engine, instance, line, {
           blockY,
           keptLeft: blockLeft,
           keptWidth: i.width,
-          isPerfect: true
+          isPerfect: !isFirstBlock
         })
       } else {
         // partial overlap → clip & stack (only the truly-overhanging part breaks off)
-        const leftCut = overlapLeft - blockLeft
-        const rightCut = blockRight - overlapRight
-        // Forgiving near-miss: a tiny overhang (< ~4% width or a few px) counts as
-        // a clean full-width stack — no visible clipping.
-        const grace = Math.max(4, instance.width * 0.04)
-        // The very first block is never clipped — it always lands whole so the
-        // tower starts life at full width no matter where the player drops it.
-        const isFirstBlock = engine.getVariable(constant.successCount, 0) === 0
-        if (isFirstBlock || (leftCut <= grace && rightCut <= grace)) {
-          i.status = constant.land
-          instance.y = blockY
-          applyLand(engine, instance, line, {
-            blockY,
-            keptLeft: blockLeft,
-            keptWidth: i.width,
-            isPerfect: false
+        i.status = constant.land
+        instance.y = blockY
+        applyLand(engine, instance, line, {
+          blockY,
+          keptLeft: overlapLeft,
+          keptWidth: overlapWidth,
+          isPerfect: false
+        })
+        // One jagged cut shared by the kept piece and its fragment so the break
+        // looks like a real split. The cut side is the side that overhangs; the
+        // jag depth scales with the real cut width so it never extends past it.
+        const cutSide = leftCut > rightCut ? 'left' : 'right'
+        const cutDepth = Math.max(leftCut, rightCut)
+        i.cutJag = makeJag(blockLeft + blockRight, cutDepth)
+        i.cutSide = cutSide
+        // The shear plays only when geometry actually removes an overhang.
+        playSfx(engine, 'clip')
+        if (leftCut > alignmentTolerance) {
+          spawnFragment(engine, i, { left: blockLeft, width: leftCut, y: blockY, fallDir: -1, cutSide: 'right', cutJag: i.cutJag })
+          // Cream bursts sideways out of the fresh break.
+          spawnCream(engine, {
+            x: overlapLeft,
+            y: blockY + (instance.height * 0.5),
+            count: 12,
+            spread: instance.height * 0.5,
+            power: 230,
+            sizeBase: instance.height * 0.18,
+            dir: -1
           })
-        } else {
-          i.status = constant.land
-          instance.y = blockY
-          applyLand(engine, instance, line, {
-            blockY,
-            keptLeft: overlapLeft,
-            keptWidth: overlapWidth,
-            isPerfect: false
+          i.dripsLeft = dripBudget(engine)
+        }
+        if (rightCut > alignmentTolerance) {
+          spawnFragment(engine, i, { left: overlapRight, width: rightCut, y: blockY, fallDir: 1, cutSide: 'left', cutJag: i.cutJag })
+          spawnCream(engine, {
+            x: overlapRight,
+            y: blockY + (instance.height * 0.5),
+            count: 12,
+            spread: instance.height * 0.5,
+            power: 230,
+            sizeBase: instance.height * 0.18,
+            dir: 1
           })
-          // One jagged cut shared by the kept piece and its fragment so the break
-          // looks like a real split. The cut side is the side that overhangs; the
-          // jag depth scales with the real cut width so it never extends past it.
-          const cutSide = leftCut > rightCut ? 'left' : 'right'
-          const cutDepth = Math.max(leftCut, rightCut)
-          i.cutJag = makeJag(blockLeft + blockRight, cutDepth)
-          i.cutSide = cutSide
-          /* The shear itself. Only this branch reaches it — a landing inside the
-           * grace window keeps its full width and nothing is cut, so it stays on
-           * the landing thud alone. Played after applyLand so it layers over that
-           * thud rather than in place of it: one sound for the layer arriving,
-           * one for the overhang coming off. */
-          playSfx(engine, 'clip')
-          if (leftCut > 1) {
-            spawnFragment(engine, i, { left: blockLeft, width: leftCut, y: blockY, fallDir: -1, cutSide: 'right', cutJag: i.cutJag })
-            // Cream bursts sideways out of the fresh break.
-            spawnCream(engine, {
-              x: overlapLeft,
-              y: blockY + (instance.height * 0.5),
-              count: 12,
-              spread: instance.height * 0.5,
-              power: 230,
-              sizeBase: instance.height * 0.18,
-              dir: -1
-            })
-            i.dripsLeft = dripBudget(engine)
-          }
-          if (rightCut > 1) {
-            spawnFragment(engine, i, { left: overlapRight, width: rightCut, y: blockY, fallDir: 1, cutSide: 'left', cutJag: i.cutJag })
-            spawnCream(engine, {
-              x: overlapRight,
-              y: blockY + (instance.height * 0.5),
-              count: 12,
-              spread: instance.height * 0.5,
-              power: 230,
-              sizeBase: instance.height * 0.18,
-              dir: 1
-            })
-            i.dripsLeft = dripBudget(engine)
-          }
+          i.dripsLeft = dripBudget(engine)
         }
       }
       break

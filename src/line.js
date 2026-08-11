@@ -8,11 +8,12 @@ export const lineAction = (instance, engine, time) => {
   if (!i.ready) {
     i.y = engine.getVariable(constant.lineInitialOffset)
     i.ready = true
-    // The first floor may land anywhere across the stacking column, so the
-    // starting target spans it end to end. Both ends are column-relative: on a
-    // laptop the canvas is wider, but the tower is still built in the middle.
+    // The first floor lands on the full stacking-column platform. collisionX
+    // is always a physical RIGHT EDGE; subtracting block width here made this
+    // initial line mean "rightmost allowed left edge", unlike every later line,
+    // and forced a special no-clipping exception in the block code.
     i.x = pl(engine)
-    i.collisionX = pl(engine) + pw(engine) - engine.getVariable(constant.blockWidth)
+    i.collisionX = pl(engine) + pw(engine)
   }
   // Tower stays still — the line never scrolls. Only the background scrolls
   // (see background.js) to give the sense of ascending.
@@ -54,4 +55,3 @@ export const linePainter = (instance, engine) => {
   ctx.stroke()
   ctx.restore()
 }
-

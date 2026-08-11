@@ -117,9 +117,57 @@ async function run(rate) {
       keyLong: watching && watching.keyer ? watching.keyer.keyedLong : 0
     }
   })
+
+  /* Reproduce the historical false-perfect exactly: on the next floor, place
+   * the block's left edge half a width inside the tower. The old collision=5
+   * branch called this perfect and kept the whole 50% overhang. Geometry must
+   * now cut it to roughly half width at both normal and throttled frame rates. */
+  const firstCount = await page.evaluate(() => window.game.getVariable('BLOCK_COUNT'))
+  await page.waitForFunction((count) => {
+    const g = window.game
+    const current = g.getVariable('BLOCK_COUNT')
+    const b = g.getInstance('block_' + current)
+    return current > count && b && b.status === 'SWING'
+  }, firstCount, { timeout: 10000 })
+  // The block exists while the hook is still lowering; inputs are intentionally
+  // ignored until that 500ms movement finishes.
+  await page.waitForTimeout(650)
+  await page.touchscreen.tap(195, 500)
+  await page.waitForFunction(() => {
+    const g = window.game
+    const b = g.getInstance('block_' + g.getVariable('BLOCK_COUNT'))
+    return b && b.status === 'DROP'
+  }, null, { timeout: 5000 })
+  await page.evaluate(() => {
+    const g = window.game
+    const b = g.getInstance('block_' + g.getVariable('BLOCK_COUNT'))
+    const line = g.getInstance('line')
+    window.__clipProbe = { originalWidth: b.width }
+    b.x = line.x + (b.width * 0.5)
+  })
+  await page.waitForFunction(() => {
+    const g = window.game
+    const b = g.getInstance('block_' + g.getVariable('BLOCK_COUNT'))
+    return b && b.status === 'LAND'
+  }, null, { timeout: 5000 })
+  const clipped = await page.evaluate(() => {
+    const g = window.game
+    const b = g.getInstance('block_' + g.getVariable('BLOCK_COUNT'))
+    const line = g.getInstance('line')
+    const originalWidth = window.__clipProbe.originalWidth
+    return {
+      originalWidth,
+      landedWidth: b.width,
+      keptRatio: b.width / originalWidth,
+      rightEdgeGap: Math.abs((b.x + b.width) - line.collisionX),
+      cutSide: b.cutSide || '',
+      falsePerfectGone: !b.perfect && b.width < originalWidth * 0.7
+        && b.width > originalWidth * 0.3
+    }
+  })
   const duration = Date.now() - started
   await browser.close()
-  return { rate, duration, mid, landed, errors }
+  return { rate, duration, mid, landed, clipped, errors }
 }
 
 async function main() {
@@ -127,7 +175,7 @@ async function main() {
   const throttled = await run(4)
   const results = [normal, throttled]
   results.forEach(r => console.log(
-    `${r.rate}x CPU: ${r.duration}ms`, JSON.stringify({ mid: r.mid, landed: r.landed, errors: r.errors })
+    `${r.rate}x CPU: ${r.duration}ms`, JSON.stringify({ mid: r.mid, landed: r.landed, clipped: r.clipped, errors: r.errors })
   ))
   const motionStable = Math.abs(throttled.landed.dropElapsed - normal.landed.dropElapsed) < 180
   const ok = results.every(r => r.mid.status === 'DROP'
@@ -142,6 +190,9 @@ async function main() {
     && r.landed.landPlayed
     && r.landed.landAudible
     && r.landed.customerReady
+    && r.clipped.falsePerfectGone
+    && r.clipped.rightEdgeGap <= 1
+    && r.clipped.cutSide === 'right'
     && (!IOS || (r.landed.appleMobile
       && r.landed.renderFps === 30
       && r.landed.appleTexture
