@@ -194,7 +194,7 @@ async function main() {
     && r.clipped.rightEdgeGap <= 1
     && r.clipped.cutSide === 'right'
     && (!IOS || (r.landed.appleMobile
-      && r.landed.renderFps === 30
+      && r.landed.renderFps === 60
       && r.landed.appleTexture
       && r.landed.customerMode === 'static'
       && r.landed.customerVideoEntries === 0

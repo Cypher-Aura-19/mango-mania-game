@@ -68,23 +68,15 @@ window.TowerGame = (option = {}) => {
     return `./assets/${resolved}?v=20260811-ios-static`
   }
 
-  /* A stable 30fps is preferable to WebKit oscillating between 60 and long
-   * stalls. Physics reads timestamps, so skipped paints do not change gravity,
-   * landing height, or game speed. This also leaves regular main-thread slots
-   * for touch/audio and (in blink mode) camera inference. */
+  /* Apple used to be forced through a hand-written 30fps gate while it was
+   * decoding three live customer videos. That gate skipped alternate rAFs and
+   * made input and cake motion feel sticky even when the screen did not visibly
+   * stutter. iOS now uses a 1x canvas, reduced effects and static customer
+   * frames, so let WebKit pace the native 60fps loop itself. Keeping the value
+   * on the shared option makes the resolved performance profile observable in
+   * the mobile regression test without wrapping Engine.animate again. */
   if (appleMobile) {
-    option.renderFps = 30
-    const engineAnimate = game.animate.bind(game)
-    const minFrame = 1000 / option.renderFps
-    let lastFrame = -Infinity
-    game.animate = (time) => {
-      if (time - lastFrame < minFrame - 1) {
-        window.requestAnimationFrame(game.animate)
-        return
-      }
-      lastFrame = time
-      engineAnimate(time)
-    }
+    option.renderFps = 60
   }
 
   game.addImg('background', pathGenerator('background.webp'))
@@ -420,6 +412,39 @@ window.TowerGame = (option = {}) => {
 
   game.pauseBgm = () => {
     game.pauseAudio('bgm')
+  }
+
+  /* Menu sound control. Audio assets remain registered even when the saved
+   * preference is off, so turning sound back on is instant and never requires
+   * a reload. The control only appears outside a run, but this deliberately
+   * silences every source so a queued effect cannot leak through the menu. */
+  game.setSoundOn = (enabled) => {
+    const next = !!enabled
+    game.soundOn = next
+    if (!next) {
+      game._bgmWanted = false
+      if (game.appleAudio) {
+        game.appleAudio.stopAll()
+      } else {
+        Object.keys(game.assetsObj.audio).forEach((name) => {
+          const audio = game.assetsObj.audio[name]
+          if (audio) audio.pause()
+        })
+        const customer = game.getInstance('customer', constant.customerLayer)
+        if (customer && customer.videos) {
+          Object.keys(customer.videos).forEach((mood) => {
+            const voice = customer.videos[mood].voice
+            if (voice) voice.pause()
+          })
+        }
+      }
+      return false
+    }
+
+    game._bgmWanted = true
+    game.unlockAudio()
+    game.playBgm()
+    return true
   }
 
   // Mobile browsers can suspend media when switching apps or opening camera

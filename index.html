@@ -1,583 +1,767 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,minimal-ui"><title>Tower Building</title><link rel="icon" type="image/x-icon" href="./assets/favicon.png"><link rel="preload" href="./assets/audex/audex-regular.woff" as="font" type="font/woff" crossorigin><link rel="preload" href="./assets/background.webp" as="image" fetchpriority="high"><style>@font-face{font-family:Audex;font-style:normal;font-weight:400;font-display:swap;src:url(assets/audex/audex-regular.woff) format('woff'),url(assets/audex/audex-regular.ttf) format('truetype')}@font-face{font-family:Audex;font-style:italic;font-weight:400;font-display:swap;src:url(assets/audex/audex-italic.woff) format('woff'),url(assets/audex/audex-italic.ttf) format('truetype')}*{margin:0;padding:0}img{width:100%}html{background:#fff;height:100%}body{font-family:Audex,"Helvetica Neue",Arial,Helvetica,sans-serif;margin:0 auto;text-align:center;width:100%;height:100%;background:#f95240 url(assets/main-bg.webp)}@media screen and (min-height:560px){html{font-size:100px}}@media screen and (min-height:640px){html{font-size:112.5px}}@media screen and (min-height:720px){html{font-size:125px}}@media screen and (min-height:800px){html{font-size:137.5px}}@media screen and (min-height:880px){html{font-size:150px}}@media screen and (min-height:960px){html{font-size:162.5px}}@media screen and (min-height:1040px){html{font-size:180px}}@media screen and (min-height:1200px){html{font-size:200px}}html{font-size:17.6vh}#canvas{position:fixed;left:0;top:0;right:0;bottom:0;margin:auto}a{text-decoration:none}li,ol,ul{list-style-type:none;padding:0;margin:0}.hide{display:none}.clear{clear:both}.loading .load-panel{text-align:center}.loading .load-head{font-size:.155rem;letter-spacing:.02em;color:#fff;text-shadow:0 .018rem .03rem rgba(72,26,0,.6)}.loading .bar{position:relative;width:62%;height:.135rem;margin:.06rem auto 0;border-radius:999px;background:#5d3213;box-shadow:inset 0 .015rem .025rem rgba(0,0,0,.5),0 .012rem 0 rgba(255,255,255,.22);overflow:hidden}.loading .bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;background-color:#f8b62a;background-image:repeating-linear-gradient(115deg,rgba(255,241,197,.75) 0 .028rem,rgba(255,241,197,0) .028rem .072rem);box-shadow:inset 0 .018rem 0 rgba(255,255,255,.55),inset 0 -.02rem .02rem rgba(190,100,0,.45);transition:width .25s ease-out}.loading .bar .pct{position:absolute;left:0;right:0;top:0;height:100%;line-height:.135rem;font-size:.085rem;font-weight:700;color:#fff;text-shadow:0 .012rem .02rem rgba(90,40,0,.8)}.loading .tip{margin-top:.07rem;font-size:.1rem;color:#fff;text-shadow:0 .015rem .025rem rgba(72,26,0,.6)}.loading .tip b{color:#ffcf4d}.loading .tip i{display:inline-block;font-style:normal;color:#ffcf4d}.loading .tip i.flip{transform:scaleX(-1)}.loading .load-detail{margin-top:.05rem;font-size:.085rem;color:rgba(255,255,255,.9);min-height:.12rem;text-shadow:0 .012rem .02rem rgba(72,26,0,.55)}.content{height:100vh;margin:0 auto;position:relative}.landing{position:relative;height:100%;background:url(assets/background.webp) center / cover no-repeat,linear-gradient(#7fc4ee 0%,#8fd0f2 46%,#c98a45 58%,#9a5f2c 100%)}
-.landing .title{width:76%;display:block;margin:0 auto;aspect-ratio:2/3;opacity:0;transition:opacity .35s ease-out}
-.landing .title.ready{opacity:1}.landing .action-1{position:relative;top:-0.9rem}.landing .logo{width:30%;position:absolute;right:.2rem;top:.2rem}.landing .action-2{position:absolute;bottom:.15rem;width:100%}.landing .start{width:43%;filter:drop-shadow(0 .05rem .08rem rgba(0,0,0,.5))}.slideTop{-webkit-animation:st 1s ease-in-out;animation:st 1s ease-in-out}@-webkit-keyframes st{0%{transform:translateZ(0)}100%{transform:translate3d(0,-100%,0)}}@keyframes st{0%{transform:translateZ(0)}100%{transform:translate3d(0,-100%,0)}}.slideBottom{-webkit-animation:sb 1s ease-in-out;animation:sb 1s ease-in-out}@-webkit-keyframes sb{0%{transform:translateZ(0)}100%{transform:translate3d(0,200%,0)}}@keyframes sb{0%{transform:translateZ(0)}100%{transform:translate3d(0,200%,0)}}.swing{-webkit-animation:sw 1s ease-in-out alternate infinite;animation:sw 1s ease-in-out alternate infinite}@-webkit-keyframes sw{0%{transform:rotate(15deg);transform-origin:top center}100%{transform:rotate(-15deg);transform-origin:top center}}@keyframes sw{0%{transform:rotate(15deg);transform-origin:top center}100%{transform:rotate(-15deg);transform-origin:top center}}.modal .mask{background-color:#000;opacity:.6;position:fixed;height:100%;width:100%;top:0;left:0}.modal .modal-content{position:fixed;height:100%;width:90%;top:0;left:0;right:0;margin:0 auto;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center}.result{position:relative;width:98%}.result-bg{display:block;width:100%}.rs-score,.rs-stats,.rs-try,.rs-actions,.rs-spark{position:absolute}.rs-score{left:15%;width:42%;top:27.21%;height:23.25%;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center}.rs-score-label{font-size:calc(var(--gw) * .0501);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#54371d}.rs-score-value{margin-top:calc(var(--gw) * .0128);font-size:calc(var(--gw) * .1332);white-space:nowrap;font-weight:700;line-height:1;color:#4f2e08}.rs-spark{background:#ffc531;-webkit-clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}.rs-spark.a{left:14.4%;top:34.6%;width:4.4%;padding-bottom:4.4%}.rs-spark.b{left:15.6%;top:41.4%;width:3.1%;padding-bottom:3.1%}.rs-stats{left:13.96%;right:15.04%;top:53.58%;height:14.45%;box-sizing:border-box;padding:0 4.5%;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column}.rs-row{-webkit-box-flex:1;flex:1 1 0;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center}.rs-row + .rs-row{border-top:1px solid rgba(183,142,96,.28)}.rs-icon{-webkit-box-flex:0;flex:none;width:calc(var(--gw) * .0724);height:calc(var(--gw) * .0724);border-radius:50%;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center}.rs-icon svg{display:block;width:64%;height:64%}.rs-icon-tower{background:#2f6e33}.rs-icon-best{background:#f5a623}.rs-label{-webkit-box-flex:1;flex:1 1 auto;min-width:0;margin-left:calc(var(--gw) * .0256);text-align:left;font-size:calc(var(--gw) * .0383);font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#5b3d22;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rs-val{-webkit-box-flex:0;flex:none;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-align:center;align-items:center;line-height:1}.rs-val.inline{-webkit-box-orient:horizontal;flex-direction:row}.rs-val b{font-size:calc(var(--gw) * .0533);font-weight:700;color:#3e7d18}.rs-val em{margin-top:calc(var(--gw) * .0085);font-style:normal;font-size:calc(var(--gw) * .0277);letter-spacing:.06em;text-transform:uppercase;color:#8a6a46}.rs-val .orange{color:#f0910c}.rs-badge{margin-left:calc(var(--gw) * .0149);padding:calc(var(--gw) * .0085) calc(var(--gw) * .0117);border-radius:calc(var(--gw) * .016);background:#e4502a;color:#fff;font-style:normal;font-size:calc(var(--gw) * .0202);font-weight:700;line-height:1.2;letter-spacing:.02em;text-transform:uppercase}.rs-btn{padding:0 calc(var(--gw) * .026);-webkit-appearance:none;appearance:none;box-sizing:border-box;border:0;font-family:inherit;font-weight:700;letter-spacing:.04em;text-transform:uppercase;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}.rs-btn svg{display:block;-webkit-box-flex:0;flex:none}.rs-btn:active{-webkit-transform:scale(.98);transform:scale(.98)}.rs-try{left:13.96%;right:15.04%;top:71.68%;height:7.42%;border-radius:999px;font-size:calc(var(--gw) * .0618);color:#fff;background:linear-gradient(#82b415,#4d8a0c);border:calc(var(--gw) * .0085) solid #3a6a09;box-shadow:inset 0 calc(var(--gw) * .0096) 0 rgba(255,255,255,.32),0 calc(var(--gw) * .0096) 0 rgba(48,88,8,.5);text-shadow:0 calc(var(--gw) * .0043) 0 rgba(0,0,0,.25)}.rs-try svg{width:calc(var(--gw) * .0533);height:calc(var(--gw) * .0533);margin-right:calc(var(--gw) * .0234)}.rs-actions{left:13.96%;right:15.04%;top:81.97%;height:5.73%;display:-webkit-box;display:flex}.rs-actions .rs-btn{padding:0 calc(var(--gw) * .016);-webkit-box-flex:1;flex:1 1 0;height:100%;border-radius:calc(var(--gw) * .032)}.rs-lead{margin-right:calc(var(--gw) * .0277);font-size:calc(var(--gw) * .0309);color:#fff;background:linear-gradient(#fdc21e,#f6980a);border:calc(var(--gw) * .0075) solid #dd7d03;box-shadow:inset 0 calc(var(--gw) * .0075) 0 rgba(255,255,255,.38),0 calc(var(--gw) * .0085) 0 rgba(190,105,4,.5);text-shadow:0 calc(var(--gw) * .0032) 0 rgba(0,0,0,.2)}.rs-home{font-size:calc(var(--gw) * .0405);color:#5c3213;background:linear-gradient(#f8e3c2,#eecfa2);border:calc(var(--gw) * .0075) solid #d6ae7c;box-shadow:inset 0 calc(var(--gw) * .0075) 0 rgba(255,255,255,.6),0 calc(var(--gw) * .0085) 0 rgba(190,155,110,.5)}.rs-lead svg,.rs-home svg{width:calc(var(--gw) * .0362);height:calc(var(--gw) * .0362);margin-right:calc(var(--gw) * .0107)}.board{position:relative;width:98%}.board-bg{display:block;width:100%}.lb-list,.lb-actions{position:absolute}.lb-list{left:15.29%;right:17.55%;top:26.47%;height:44.27%;box-sizing:border-box;border:1px solid rgba(212,168,109,.6);border-radius:calc(var(--gw) * .0373);background:rgba(255,248,228,.55);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(198,160,110,.55) transparent;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column}.lb-empty{-webkit-box-flex:1;flex:1 1 auto;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center;padding:0 8%;font-size:calc(var(--gw) * .034);line-height:1.45;color:#9a7a52}.lb-empty b{display:block;margin-bottom:calc(var(--gw) * .012);font-size:calc(var(--gw) * .042);color:#7a5426}.lb-list::-webkit-scrollbar{width:calc(var(--gw) * .012)}.lb-list::-webkit-scrollbar-thumb{border-radius:99px;background:rgba(198,160,110,.55)}.lb-row{-webkit-box-flex:0;flex:0 0 16.6667%;min-height:0;box-sizing:border-box;padding:0 calc(var(--gw) * .0234);display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;will-change:transform}.lb-row.sliding{-webkit-transition:-webkit-transform .62s cubic-bezier(.22,.9,.24,1);transition:transform .62s cubic-bezier(.22,.9,.24,1);z-index:2}.lb-row.arriving{-webkit-animation:lbIn .45s ease-out both;animation:lbIn .45s ease-out both}@-webkit-keyframes lbIn{0%{opacity:0}100%{opacity:1}}@keyframes lbIn{0%{opacity:0}100%{opacity:1}}.lb-row.climbed{-webkit-animation:lbPop .5s ease-out;animation:lbPop .5s ease-out}@-webkit-keyframes lbPop{0%,100%{background-color:transparent}45%{background-color:rgba(255,214,102,.85)}}@keyframes lbPop{0%,100%{background-color:transparent}45%{background-color:rgba(255,214,102,.85)}}@media (prefers-reduced-motion:reduce){.lb-row.sliding{-webkit-transition:none;transition:none}.lb-row.arriving,.lb-row.climbed{-webkit-animation:none;animation:none}}.lb-row + .lb-row{border-top:1px solid rgba(198,160,110,.32)}.lb-row.gold{background:linear-gradient(rgba(255,241,190,.9),rgba(255,233,162,.9))}.lb-row.me{background:linear-gradient(rgba(253,245,175,.95),rgba(249,231,128,.95));border-top:1px solid rgba(212,168,109,.6)}.lb-medal{-webkit-box-flex:0;flex:none;display:block;width:calc(var(--gw) * .082);height:auto}.lb-rank{-webkit-box-flex:0;flex:none;box-sizing:border-box;width:calc(var(--gw) * .065);height:calc(var(--gw) * .065);margin:0 calc(var(--gw) * .0085);border-radius:50%;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center;font-size:calc(var(--gw) * .036);font-weight:700;line-height:1;color:#7a5426;background:linear-gradient(#fdf1d2,#f1dcac);border:calc(var(--gw) * .005) solid #d9b57d;box-shadow:inset 0 calc(var(--gw) * .004) 0 rgba(255,255,255,.7)}.lb-rank.mine{color:#fff;background:linear-gradient(#fdb62a,#ef8c05);border-color:#cd7103}.lb-face{-webkit-box-flex:0;flex:none;display:block;width:calc(var(--gw) * .078);height:calc(var(--gw) * .078);margin-left:calc(var(--gw) * .014);border-radius:50%;object-fit:cover;background:#e7e3dd;box-shadow:0 0 0 calc(var(--gw) * .005) rgba(212,168,109,.8)}.lb-name{-webkit-box-flex:1;flex:1 1 auto;min-width:0;margin:0 calc(var(--gw) * .013) 0 calc(var(--gw) * .02);text-align:left;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-pack:center;justify-content:center;overflow:hidden}.lb-name b,.lb-name i{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lb-name b{font-size:calc(var(--gw) * .036);font-weight:700;line-height:1.2;color:#4a3016}.lb-name i{margin-top:calc(var(--gw) * .004);font-style:normal;font-size:calc(var(--gw) * .025);font-weight:400;line-height:1.2;letter-spacing:.02em;color:#9a7a52}.lb-row.me .lb-name b{color:#3e7d18}.lb-row.me .lb-name i{color:#5f8f3c}.lb-you{-webkit-box-flex:0;flex:none;margin-right:calc(var(--gw) * .022);padding:calc(var(--gw) * .008) calc(var(--gw) * .022);border-radius:999px;font-size:calc(var(--gw) * .026);font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1;color:#fff;background:linear-gradient(#5aa832,#3e7d18);box-shadow:0 calc(var(--gw) * .003) 0 rgba(0,0,0,.18)}.lb-score{-webkit-box-flex:0;flex:none;font-size:calc(var(--gw) * .049);font-weight:700;line-height:1;color:#5b3a12}.lb-actions{left:17.25%;right:19.17%;top:73.04%;height:6.42%;display:-webkit-box;display:flex}.lb-actions .rs-btn{padding:0 calc(var(--gw) * .016);-webkit-box-flex:1;flex:1 1 0;height:100%;border-radius:999px;font-size:calc(var(--gw) * .032);letter-spacing:.02em}.lb-actions .rs-home{margin-right:calc(var(--gw) * .0256)}.lb-play{color:#fff;background:linear-gradient(#82b415,#4d8a0c);border:calc(var(--gw) * .0075) solid #3a6a09;box-shadow:inset 0 calc(var(--gw) * .0085) 0 rgba(255,255,255,.32),0 calc(var(--gw) * .0085) 0 rgba(48,88,8,.5);text-shadow:0 calc(var(--gw) * .0032) 0 rgba(0,0,0,.25)}.lb-actions svg{width:calc(var(--gw) * .0383);height:calc(var(--gw) * .0383);margin-right:calc(var(--gw) * .0107)}@font-face{font-family:wenxue;src:url(assets/wenxue.eot);src:url(assets/wenxue.eot),url(assets/wenxue.woff),url(assets/wenxue.ttf),url(assets/wenxue.svg)}.font-wenxue{font-family:Audex,wenxue}.profile{position:absolute;top:0;left:0;width:100%;height:100%}.profile:not(.hide){display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center}.profile .card{position:relative;width:86%}.profile .card-bg{display:block;width:100%}.profile .form{position:absolute;left:11%;right:11%;top:24%;bottom:6.5%;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-pack:start;justify-content:flex-start}.profile .form > *:last-child{margin-top:auto}.profile .label{font-size:calc(var(--gw) * .038);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a5312;text-shadow:0 1px 0 rgba(255,255,255,.6);margin-bottom:calc(var(--gw) * .022)}.profile .label.spaced{margin-top:calc(var(--gw) * .05);margin-bottom:calc(var(--gw) * .03)}.profile .name-input{display:block;width:100%;box-sizing:border-box;height:calc(var(--gw) * .13);padding:0 calc(var(--gw) * .04);font-family:inherit;font-size:calc(var(--gw) * .056);font-weight:700;text-align:center;color:#5c3a1e;background:#fff6e0;border:calc(var(--gw) * .011) solid #e79a2b;border-radius:calc(var(--gw) * .05);outline:0;-webkit-appearance:none;box-shadow:inset 0 calc(var(--gw) * .008) calc(var(--gw) * .016) rgba(180,120,40,.25)}.profile .row{display:-webkit-box;display:flex;-webkit-box-align:start;align-items:flex-start}.profile .field{-webkit-box-flex:1;flex:1 1 0;min-width:0}.profile .field + .field{margin-left:calc(var(--gw) * .035)}.profile .row .label{font-size:calc(var(--gw) * .032);margin-bottom:calc(var(--gw) * .018)}.profile .row .name-input{height:calc(var(--gw) * .115);padding:0 calc(var(--gw) * .018);font-size:calc(var(--gw) * .04);border-radius:calc(var(--gw) * .045);letter-spacing:-.005em}.profile .row .name-input::-webkit-input-placeholder{font-size:calc(var(--gw) * .04)}.profile .name-input::-webkit-input-placeholder{color:#c8a068;font-weight:400}.profile .name-input:focus{border-color:#d4790f;background:#fffdf5}.profile .avatars{display:-webkit-box;display:flex;flex-wrap:wrap;-webkit-box-pack:center;justify-content:center}.profile .avatar{width:26%;position:relative;margin:0 calc(var(--gw) * .018) calc(var(--gw) * .022);cursor:pointer;-webkit-tap-highlight-color:transparent;opacity:.6;-webkit-filter:saturate(.5);filter:saturate(.5);-webkit-transition:-webkit-transform .16s ease,opacity .16s ease;transition:transform .16s ease,opacity .16s ease}.profile .avatar img{display:block;width:100%}.profile .avatar.on{opacity:1;-webkit-filter:drop-shadow(0 0 calc(var(--gw) * .02) rgba(212,121,15,.9));filter:drop-shadow(0 0 calc(var(--gw) * .02) rgba(212,121,15,.9));-webkit-transform:scale(1.08);transform:scale(1.08)}.profile .go{display:block;width:62%;margin:0 auto;position:relative;top:calc(var(--gw) * .05);cursor:pointer;filter:drop-shadow(0 .03rem .05rem rgba(0,0,0,.35))}.profile .go:active{transform:scale(.96)}.shake{-webkit-animation:sk .4s ease-in-out;animation:sk .4s ease-in-out}@-webkit-keyframes sk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6%)}40%,80%{transform:translateX(6%)}}@keyframes sk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6%)}40%,80%{transform:translateX(6%)}}.popIn{-webkit-animation:pi .35s cubic-bezier(.22,1,.36,1);animation:pi .35s cubic-bezier(.22,1,.36,1)}@-webkit-keyframes pi{0%{transform:scale(.7);opacity:0}100%{transform:scale(1);opacity:1}}@keyframes pi{0%{transform:scale(.7);opacity:0}100%{transform:scale(1);opacity:1}}.popOut{-webkit-animation:po .3s ease-in forwards;animation:po .3s ease-in forwards}@-webkit-keyframes po{0%{transform:scale(1);opacity:1}100%{transform:scale(.7);opacity:0}}@keyframes po{0%{transform:scale(1);opacity:1}100%{transform:scale(.7);opacity:0}}.party-fx{position:fixed;left:0;top:0;right:0;bottom:0;z-index:150;pointer-events:none}.party-fx-canvas{position:absolute;left:50%;top:50%;-webkit-transform:translate(-50%,-50%);transform:translate(-50%,-50%)}.party-banner{position:absolute;left:50%;top:22%;-webkit-transform:translateX(-50%);transform:translateX(-50%);display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;gap:calc(var(--gw) * .03);padding:calc(var(--gw) * .028) calc(var(--gw) * .055);white-space:nowrap;border-radius:999px;background:linear-gradient(#fff6dc,#ffe9ae);border:calc(var(--gw) * .006) solid #d9b57d;box-shadow:0 calc(var(--gw) * .012) calc(var(--gw) * .03) rgba(90,55,10,.35);-webkit-animation:partyIn .5s cubic-bezier(.16,1,.3,1) both;animation:partyIn .5s cubic-bezier(.16,1,.3,1) both}.party-icon{-webkit-box-flex:0;flex:none;width:calc(var(--gw) * .09);height:auto}.party-icon-l{-webkit-animation:partyTilt 1.1s ease-in-out infinite;animation:partyTilt 1.1s ease-in-out infinite}.party-icon-r{-webkit-animation:partyTilt 1.1s ease-in-out infinite reverse;animation:partyTilt 1.1s ease-in-out infinite reverse}.party-text{display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;line-height:1.15}.party-text b{font-size:calc(var(--gw) * .058);color:#7a5426}.party-text i{font-style:normal;font-size:calc(var(--gw) * .032);color:#a9702a}.party-out .party-banner{-webkit-animation:partyOut .38s ease-in forwards;animation:partyOut .38s ease-in forwards}@keyframes partyIn{0%{transform:translateX(-50%) scale(.6);opacity:0}100%{transform:translateX(-50%) scale(1);opacity:1}}@keyframes partyOut{0%{transform:translateX(-50%) scale(1);opacity:1}100%{transform:translateX(-50%) scale(.85);opacity:0}}@keyframes partyTilt{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(9deg)}}@media (prefers-reduced-motion:reduce){.party-banner,.party-icon-l,.party-icon-r{-webkit-animation:none;animation:none}}/* control-mode chooser: same stock as the profile card, so picking how you play and typing your name read as one step. The two illustrations ARE the buttons — mode-card.webp is only the frame around them, and these three percentages come straight out of tools/make-mode-cards.py. Height is left to the image so the artwork can never letterbox. */.mode{position:absolute;top:0;left:0;width:100%;height:100%}.mode:not(.hide){display:flex;align-items:center;justify-content:center}.mode .card{position:relative;width:94%}.mode .card-bg{display:block;width:100%}.mode-pick{position:absolute;top:28.65%;width:39%;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .16s ease;filter:drop-shadow(0 .04rem .06rem rgba(0,0,0,.28))}.mode-pick[data-mode=blink]{left:5.8%}.mode-pick[data-mode=tap]{left:55.2%}.mode-pick:active{transform:scale(.955)}@media (hover:hover){.mode-pick:hover{transform:translateY(-1.5%) scale(1.025)}}</style></head><body><canvas id="canvas" class="hide"></canvas><div class="content"><div class="landing loading"><div class="action-1"><img src="./assets/main-index-title.webp?v=20260811-audio-assets" class="title swing"></div><div class="action-2"><div class="load-panel"><div class="load-head">Loading...</div><div class="bar"><div class="fill"></div><div class="pct">0%</div></div><div class="tip"><i>⇒</i> <b>Tip:</b> Stack cakes higher to earn bigger rewards! <i class="flip">⇒</i></div><div class="load-detail"></div></div><img id="start" src="./assets/main-index-start.webp" class="start hide"></div></div><div id="mode" class="mode hide"><div class="card"><img src="./assets/mode-card.webp" class="card-bg" alt="How will you play?" decoding="async"><img class="mode-pick" data-mode="blink" src="./assets/mode-blink.webp" alt="Play by blinking" decoding="async"><img class="mode-pick" data-mode="tap" src="./assets/mode-tap.webp" alt="Play by tapping" decoding="async"></div></div><div id="profile" class="profile hide"><div class="card"><img src="./assets/profile.webp" class="card-bg" decoding="async"><div class="form"><div class="row"><div class="field"><div class="label">Name</div><input id="player-name" class="name-input" type="text" maxlength="12" placeholder="Your name" autocomplete="off" autocapitalize="words" spellcheck="false"></div><div class="field"><div class="label">Company</div><input id="player-company" class="name-input" type="text" maxlength="16" placeholder="Optional" autocomplete="off" autocapitalize="words" spellcheck="false"></div></div><div><div class="label spaced">Pick Your Avatar</div><div id="avatars" class="avatars"></div></div><img id="profile-go" src="./assets/main-index-start.webp" class="go"></div></div></div><div id="modal" class="modal hide"><div class="mask"></div><div class="js-modal-content modal-content"><div id="over-modal" class="result hide"><img src="./assets/result.webp" class="result-bg" alt="Score summary" decoding="async"><i class="rs-spark a"></i><i class="rs-spark b"></i><div class="rs-score"><div class="rs-score-label">Your Score</div><div id="score" class="rs-score-value">0</div></div><div class="rs-stats"><div class="rs-row"><span class="rs-icon rs-icon-tower"><svg viewBox="0 0 24 24"><circle cx="12" cy="4.4" r="1.6" fill="#fff"/><rect x="8.3" y="6.9" width="7.4" height="3.5" rx="1.2" fill="#fff"/><rect x="5.9" y="11.3" width="12.2" height="3.8" rx="1.3" fill="#fff"/><rect x="3.5" y="16" width="17" height="4" rx="1.4" fill="#fff"/></svg></span><span class="rs-label">Tower Height</span><span class="rs-val"><b id="result-height">0</b><em>Layers</em></span></div><div class="rs-row"><span class="rs-icon rs-icon-best"><svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z" fill="#fff"/></svg></span><span class="rs-label">Best Score</span><span class="rs-val inline"><b id="result-best" class="orange">0</b><i id="result-newbest" class="rs-badge hide">New<br>Best!</i></span></div></div><button type="button" class="rs-btn rs-try js-reload"><svg viewBox="0 0 24 24"><path d="M7 4.3l13.2 7.7L7 19.7z" fill="#fff"/></svg><span>Try Again</span></button><div class="rs-actions"><button type="button" class="rs-btn rs-lead js-leaderboard"><svg viewBox="0 0 24 24"><path d="M7 2.6h10v5.1a5 5 0 0 1-10 0z" fill="#fff"/><path d="M7 4.2H4.2v2.1A3.7 3.7 0 0 0 7.9 10M17 4.2h2.8v2.1A3.7 3.7 0 0 1 16.1 10" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M10.8 12.2h2.4v3.4h-2.4z" fill="#fff"/><rect x="7.4" y="15.6" width="9.2" height="2.8" rx="1.1" fill="#fff"/></svg><span>Leaderboard</span></button><button type="button" class="rs-btn rs-home js-home"><svg viewBox="0 0 24 24"><path d="M12 3.2L2.6 11.1h2.7v9h5.1v-5.6h3.2v5.6h5.1v-9h2.7z" fill="currentColor"/></svg><span>Home</span></button></div></div><div id="board-modal" class="board hide"><img src="./assets/leaderboard.webp" class="board-bg" alt="Leaderboard" decoding="async"><div id="lb-list" class="lb-list"></div><div class="lb-actions"><button type="button" class="rs-btn rs-home js-home"><svg viewBox="0 0 24 24"><path d="M12 3.2L2.6 11.1h2.7v9h5.1v-5.6h3.2v5.6h5.1v-9h2.7z" fill="currentColor"/></svg><span>Home</span></button><button type="button" class="rs-btn lb-play js-reload"><svg viewBox="0 0 24 24"><path d="M7 4.3l13.2 7.7L7 19.7z" fill="#fff"/></svg><span>Play Again</span></button></div></div></div></div></div><script src="./dist/main.js?v=20260811-overhang-geometry"></script><script src="./assets/zepto-1.1.6.min.js"></script><script src="./assets/leaderboard-client.js"></script><script src="./assets/celebrate.js"></script><script>var domReady, loadFinish, canvasReady, pageReady, vidReady, loadError, gameStart, game, score, successCount
-  var gameProgress = 0, pageProgress = 0, vidProgress = 0
-  // init window height and width
-  var gameWidth = window.innerWidth
-  var gameHeight = window.innerHeight
-  var ratio = 1.5
-  if (gameHeight / gameWidth < ratio) {
-    gameWidth = Math.ceil(gameHeight / ratio)
-  }
-  $('.content').css({ "height": gameHeight + "px", "width": gameWidth + "px" })
-  $('.js-modal-content').css({ "width": gameWidth + "px" })
-  // The profile card is sized off the play column, not the viewport, so its
-  // text and avatar chips scale with the card itself on every screen shape.
-  document.documentElement.style.setProperty('--gw', gameWidth + 'px')
-
-  /* Reveal the PLAY button once the DOM, the engine's assets, the page's own
-   * artwork and the customer's three clips are all in. Guarded by loadFinish
-   * because those arrive on their own clocks and each calls here — running twice
-   * used to be harmless, but the replay branch below starts a run, and a second
-   * pass would drop the title screen on top of it. */
-  function hideLoading() {
-    if (loadFinish || !domReady || !canvasReady || !pageReady || !vidReady) return
-    $('#canvas').show()
-    loadFinish = true
-    // Let the bar visibly land on 100% and sit there for the beat before the
-    // button takes its place; stopping at 99% and vanishing reads as a hang.
-    renderProgress()
-    setTimeout(function () {
-      /* A replay never sees the title screen. The engine is loaded and its
-       * loop is running by now — canvasReady is set on the same 100% tick that
-       * fires game.load's callback, a whole second before this — so the run can
-       * be started straight from here. See takeReplay. */
-      if (replay && game) {
-        $('.landing').hide()
-        gameStart = true
-        game.start()
-        // Same as #profile-go: arm the celebration while the screen is still
-        // settling, so the mark to beat is in hand before the first landing.
-        partyArm()
-        return
-      }
-      /* Coming back from the other edition, the player has already pressed
-       * START and already chosen — showing them the title screen again would
-       * make them press START twice for one run. Straight to the card. */
-      if (modePicked) {
-        $('.landing').hide()
-        gameStart = true
-        profileShow()
-        return
-      }
-      /* Hand .action-2 over from the bar to the PLAY button. The screen around
-       * it — backdrop, logo, its swing — has been up since the first frame and
-       * stays exactly as it is, so this is the only thing that moves. */
-      $('.load-panel').hide()
-      $('#start').removeClass('hide')
-    }, 600)
-  }
-
-  /* The page's own images. The engine's loader never sees these — they are
-   * <img> tags and CSS backgrounds, not sprites — so they are warmed here and
-   * counted into the same bar. decode() rather than plain onload where it
-   * exists: onload means the bytes arrived, decode() means the pixels are ready
-   * to paint, and the difference is exactly the hitch this is here to remove.
-   * A failure counts as done; a missing medal must not strand the gate. */
-  var PAGE_IMAGES = ['background', 'main-bg', 'main-index-title', 'main-index-start',
-    'mode-card', 'mode-blink', 'mode-tap', 'profile', 'result', 'leaderboard',
-    'medal-1', 'medal-2', 'medal-3',
-    'avatar1', 'avatar2', 'avatar3', 'avatar4', 'avatar5', 'avatar6']
-  var ASSET_REV = '?v=20260811-audio-assets'
-
-  function pageImageUrl(name) {
-    var resized = name === 'main-index-title' || name.indexOf('avatar') === 0
-    return './assets/' + name + '.webp' + (resized ? ASSET_REV : '')
-  }
-
-  /* The sign is already in the markup and already swinging, so it cannot be
-   * waited for like the rest — it has to be faded in where it stands. Its box
-   * is reserved in CSS, so nothing below it moves when it appears. */
-  function revealTitle() {
-    var img = document.querySelector('.landing .title')
-    if (!img) return
-    var show = function () { img.className += ' ready' }
-    if (img.decode) img.decode().then(show, show)
-    else if (img.complete) show()
-    else { img.onload = show; img.onerror = show }
-  }
-
-  function preloadPageImages() {
-    revealTitle()
-    var done = 0
-    function step() {
-      done += 1
-      pageProgress = done / PAGE_IMAGES.length
-      renderProgress()
-      if (done === PAGE_IMAGES.length) {
-        pageReady = true
-        hideLoading()
-      }
-    }
-    PAGE_IMAGES.forEach(function (name) {
-      var img = new Image()
-      img.onerror = step
-      img.src = pageImageUrl(name)
-      if (img.decode) {
-        img.decode().then(step, step)
-      } else {
-        img.onload = step
-      }
-    })
-  }
-
-  /* One bar, three sources: the engine's assets, the page's artwork and the
-   * customer's clips. The engine's share is the largest because it is the
-   * largest download — audio and every sprite — and because the game cannot
-   * start without it either way. The clips get the smallest share of the three
-   * despite being megabytes each: they stream, so the bar only has to cover the
-   * first playable chunk of each one, not the whole file. */
-  function renderProgress() {
-    var combined = (gameProgress * 0.6) + (pageProgress * 0.25) + (vidProgress * 0.15)
-    var pct = loadFinish ? 100 : Math.min(99, Math.round(combined * 100))
-    $('.loading .pct').text(pct + '%')
-    $('.loading .fill').css({ 'width': pct + '%' })
-  }
-
-  function updateLoading(status) {
-    var success = status.success
-    var total = status.total
-    var failed = status.failed
-    if (failed > 0 && !loadError) {
-      loadError = true
-      alert('Network error... Please try again.')
-      return
-    }
-    gameProgress = total > 0 ? success / total : 0
-    renderProgress()
-    if (gameProgress >= 1 && !canvasReady) {
-      canvasReady = true
-      hideLoading()
-    }
-  }
-
-  // ---- game over summary -------------------------------------------------
-  // assets/result.webp carries every static part of the card — banner, heading,
-  // the two empty boxes and the cake — so only the three numbers and the NEW
-  // BEST badge are filled in here. Best score lives in localStorage next to the
-  // profile because Try Again reloads the page.
-  var BEST_KEY = 'mangoMania.best'
-
-  function readBest() {
-    try {
-      return parseInt(localStorage.getItem(BEST_KEY), 10) || 0
-    } catch (e) {
-      return 0
-    }
-  }
-
-  function overShowOver() {
-    var best = readBest()
-    var isBest = score > best
-    if (isBest) {
-      best = score
+<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,minimal-ui"><title>Tower Building</title><link rel="icon" type="image/x-icon" href="./assets/favicon.png"><link rel="preload" href="./assets/audex/audex-regular.woff" as="font" type="font/woff" crossorigin><link rel="preload" href="./assets/background.webp" as="image" fetchpriority="high"><style>@font-face{font-family:Audex;font-style:normal;font-weight:400;font-display:swap;src:url(assets/audex/audex-regular.woff) format("woff"),url(assets/audex/audex-regular.ttf) format("truetype")}@font-face{font-family:Audex;font-style:italic;font-weight:400;font-display:swap;src:url(assets/audex/audex-italic.woff) format("woff"),url(assets/audex/audex-italic.ttf) format("truetype")}*{margin:0;padding:0}img{width:100%}html{background:#fff;height:100%}body{font-family:Audex,"Helvetica Neue",Arial,Helvetica,sans-serif;margin:0 auto;text-align:center;width:100%;height:100%;background:#f95240 url(assets/main-bg.webp)}@media screen and (min-height:560px){html{font-size:100px}}@media screen and (min-height:640px){html{font-size:112.5px}}@media screen and (min-height:720px){html{font-size:125px}}@media screen and (min-height:800px){html{font-size:137.5px}}@media screen and (min-height:880px){html{font-size:150px}}@media screen and (min-height:960px){html{font-size:162.5px}}@media screen and (min-height:1040px){html{font-size:180px}}@media screen and (min-height:1200px){html{font-size:200px}}html{font-size:17.6vh}#canvas{position:fixed;left:0;top:0;right:0;bottom:0;margin:auto}a{text-decoration:none}li,ol,ul{list-style-type:none;padding:0;margin:0}.hide{display:none}.clear{clear:both}.loading .load-panel{text-align:center}.loading .load-head{font-size:.155rem;letter-spacing:.02em;color:#fff;text-shadow:0 .018rem .03rem rgba(72,26,0,.6)}.loading .bar{position:relative;width:62%;height:.135rem;margin:.06rem auto 0;border-radius:999px;background:#5d3213;box-shadow:inset 0 .015rem .025rem rgba(0,0,0,.5),0 .012rem 0 rgba(255,255,255,.22);overflow:hidden}.loading .bar .fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;background-color:#f8b62a;background-image:repeating-linear-gradient(115deg,rgba(255,241,197,.75) 0 .028rem,rgba(255,241,197,0) .028rem .072rem);box-shadow:inset 0 .018rem 0 rgba(255,255,255,.55),inset 0 -.02rem .02rem rgba(190,100,0,.45);transition:width .25s ease-out}.loading .bar .pct{position:absolute;left:0;right:0;top:0;height:100%;line-height:.135rem;font-size:.085rem;font-weight:700;color:#fff;text-shadow:0 .012rem .02rem rgba(90,40,0,.8)}.loading .tip{margin-top:.07rem;font-size:.1rem;color:#fff;text-shadow:0 .015rem .025rem rgba(72,26,0,.6)}.loading .tip b{color:#ffcf4d}.loading .tip i{display:inline-block;font-style:normal;color:#ffcf4d}.loading .tip i.flip{transform:scaleX(-1)}.loading .load-detail{margin-top:.05rem;font-size:.085rem;color:rgba(255,255,255,.9);min-height:.12rem;text-shadow:0 .012rem .02rem rgba(72,26,0,.55)}.content{height:100vh;margin:0 auto;position:relative}.landing{position:relative;height:100%;background:url(assets/background.webp) center/cover no-repeat,linear-gradient(#7fc4ee 0,#8fd0f2 46%,#c98a45 58%,#9a5f2c 100%)}.landing .title{width:76%;display:block;margin:0 auto;aspect-ratio:2/3;opacity:0;transition:opacity .35s ease-out}.landing .title.ready{opacity:1}.landing .action-1{position:relative;top:-.9rem}.landing .logo{width:30%;position:absolute;right:.2rem;top:.2rem}.landing .action-2{position:absolute;bottom:.15rem;width:100%}.landing .start{width:43%;filter:drop-shadow(0 .05rem .08rem rgba(0, 0, 0, .5))}.slideTop{-webkit-animation:st 1s ease-in-out;animation:st 1s ease-in-out}@-webkit-keyframes st{0%{transform:translateZ(0)}100%{transform:translate3d(0,-100%,0)}}@keyframes st{0%{transform:translateZ(0)}100%{transform:translate3d(0,-100%,0)}}.slideBottom{-webkit-animation:sb 1s ease-in-out;animation:sb 1s ease-in-out}@-webkit-keyframes sb{0%{transform:translateZ(0)}100%{transform:translate3d(0,200%,0)}}@keyframes sb{0%{transform:translateZ(0)}100%{transform:translate3d(0,200%,0)}}.swing{-webkit-animation:sw 1s ease-in-out alternate infinite;animation:sw 1s ease-in-out alternate infinite}@-webkit-keyframes sw{0%{transform:rotate(15deg);transform-origin:top center}100%{transform:rotate(-15deg);transform-origin:top center}}@keyframes sw{0%{transform:rotate(15deg);transform-origin:top center}100%{transform:rotate(-15deg);transform-origin:top center}}.modal .mask{background-color:#000;opacity:.6;position:fixed;height:100%;width:100%;top:0;left:0}.modal .modal-content{position:fixed;height:100%;width:90%;top:0;left:0;right:0;margin:0 auto;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center}.result{position:relative;width:98%}.result-bg{display:block;width:100%}.rs-actions,.rs-score,.rs-spark,.rs-stats,.rs-try{position:absolute}.rs-score{left:15%;width:42%;top:27.21%;height:23.25%;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center}.rs-score-label{font-size:calc(var(--gw) * .0501);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#54371d}.rs-score-value{margin-top:calc(var(--gw) * .0128);font-size:calc(var(--gw) * .1332);white-space:nowrap;font-weight:700;line-height:1;color:#4f2e08}.rs-spark{background:#ffc531;-webkit-clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%)}.rs-spark.a{left:14.4%;top:34.6%;width:4.4%;padding-bottom:4.4%}.rs-spark.b{left:15.6%;top:41.4%;width:3.1%;padding-bottom:3.1%}.rs-stats{left:13.96%;right:15.04%;top:53.58%;height:14.45%;box-sizing:border-box;padding:0 4.5%;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column}.rs-row{-webkit-box-flex:1;flex:1 1 0;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center}.rs-row+.rs-row{border-top:1px solid rgba(183,142,96,.28)}.rs-icon{-webkit-box-flex:0;flex:none;width:calc(var(--gw) * .0724);height:calc(var(--gw) * .0724);border-radius:50%;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center}.rs-icon svg{display:block;width:64%;height:64%}.rs-icon-tower{background:#2f6e33}.rs-icon-best{background:#f5a623}.rs-label{-webkit-box-flex:1;flex:1 1 auto;min-width:0;margin-left:calc(var(--gw) * .0256);text-align:left;font-size:calc(var(--gw) * .0383);font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#5b3d22;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rs-val{-webkit-box-flex:0;flex:none;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-align:center;align-items:center;line-height:1}.rs-val.inline{-webkit-box-orient:horizontal;flex-direction:row}.rs-val b{font-size:calc(var(--gw) * .0533);font-weight:700;color:#3e7d18}.rs-val em{margin-top:calc(var(--gw) * .0085);font-style:normal;font-size:calc(var(--gw) * .0277);letter-spacing:.06em;text-transform:uppercase;color:#8a6a46}.rs-val .orange{color:#f0910c}.rs-badge{margin-left:calc(var(--gw) * .0149);padding:calc(var(--gw) * .0085) calc(var(--gw) * .0117);border-radius:calc(var(--gw) * .016);background:#e4502a;color:#fff;font-style:normal;font-size:calc(var(--gw) * .0202);font-weight:700;line-height:1.2;letter-spacing:.02em;text-transform:uppercase}.rs-btn{padding:0 calc(var(--gw) * .026);-webkit-appearance:none;appearance:none;box-sizing:border-box;border:0;font-family:inherit;font-weight:700;letter-spacing:.04em;text-transform:uppercase;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}.rs-btn svg{display:block;-webkit-box-flex:0;flex:none}.rs-btn:active{-webkit-transform:scale(.98);transform:scale(.98)}.rs-try{left:13.96%;right:15.04%;top:71.68%;height:7.42%;border-radius:999px;font-size:calc(var(--gw) * .0618);color:#fff;background:linear-gradient(#82b415,#4d8a0c);border:calc(var(--gw) * .0085) solid #3a6a09;box-shadow:inset 0 calc(var(--gw) * .0096) 0 rgba(255,255,255,.32),0 calc(var(--gw) * .0096) 0 rgba(48,88,8,.5);text-shadow:0 calc(var(--gw) * .0043) 0 rgba(0,0,0,.25)}.rs-try svg{width:calc(var(--gw) * .0533);height:calc(var(--gw) * .0533);margin-right:calc(var(--gw) * .0234)}.rs-actions{left:13.96%;right:15.04%;top:81.97%;height:5.73%;display:-webkit-box;display:flex}.rs-actions .rs-btn{padding:0 calc(var(--gw) * .016);-webkit-box-flex:1;flex:1 1 0;height:100%;border-radius:calc(var(--gw) * .032)}.rs-lead{margin-right:calc(var(--gw) * .0277);font-size:calc(var(--gw) * .0309);color:#fff;background:linear-gradient(#fdc21e,#f6980a);border:calc(var(--gw) * .0075) solid #dd7d03;box-shadow:inset 0 calc(var(--gw) * .0075) 0 rgba(255,255,255,.38),0 calc(var(--gw) * .0085) 0 rgba(190,105,4,.5);text-shadow:0 calc(var(--gw) * .0032) 0 rgba(0,0,0,.2)}.rs-home{font-size:calc(var(--gw) * .0405);color:#5c3213;background:linear-gradient(#f8e3c2,#eecfa2);border:calc(var(--gw) * .0075) solid #d6ae7c;box-shadow:inset 0 calc(var(--gw) * .0075) 0 rgba(255,255,255,.6),0 calc(var(--gw) * .0085) 0 rgba(190,155,110,.5)}.rs-home svg,.rs-lead svg{width:calc(var(--gw) * .0362);height:calc(var(--gw) * .0362);margin-right:calc(var(--gw) * .0107)}.board{position:relative;width:98%}.board-bg{display:block;width:100%}.lb-actions,.lb-list{position:absolute}.lb-list{left:15.29%;right:17.55%;top:26.47%;height:44.27%;box-sizing:border-box;border:1px solid rgba(212,168,109,.6);border-radius:calc(var(--gw) * .0373);background:rgba(255,248,228,.55);overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(198,160,110,0.55) transparent;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column}.lb-empty{-webkit-box-flex:1;flex:1 1 auto;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center;padding:0 8%;font-size:calc(var(--gw) * .034);line-height:1.45;color:#9a7a52}.lb-empty b{display:block;margin-bottom:calc(var(--gw) * .012);font-size:calc(var(--gw) * .042);color:#7a5426}.lb-list::-webkit-scrollbar{width:calc(var(--gw) * .012)}.lb-list::-webkit-scrollbar-thumb{border-radius:99px;background:rgba(198,160,110,.55)}.lb-row{-webkit-box-flex:0;flex:0 0 16.6667%;min-height:0;box-sizing:border-box;padding:0 calc(var(--gw) * .0234);display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;will-change:transform}.lb-row.sliding{-webkit-transition:-webkit-transform .62s cubic-bezier(.22, .9, .24, 1);transition:transform .62s cubic-bezier(.22, .9, .24, 1);z-index:2}.lb-row.arriving{-webkit-animation:lbIn .45s ease-out both;animation:lbIn .45s ease-out both}@-webkit-keyframes lbIn{0%{opacity:0}100%{opacity:1}}@keyframes lbIn{0%{opacity:0}100%{opacity:1}}.lb-row.climbed{-webkit-animation:lbPop .5s ease-out;animation:lbPop .5s ease-out}@-webkit-keyframes lbPop{0%,100%{background-color:transparent}45%{background-color:rgba(255,214,102,.85)}}@keyframes lbPop{0%,100%{background-color:transparent}45%{background-color:rgba(255,214,102,.85)}}@media (prefers-reduced-motion:reduce){.lb-row.sliding{-webkit-transition:none;transition:none}.lb-row.arriving,.lb-row.climbed{-webkit-animation:none;animation:none}}.lb-row+.lb-row{border-top:1px solid rgba(198,160,110,.32)}.lb-row.gold{background:linear-gradient(rgba(255,241,190,.9),rgba(255,233,162,.9))}.lb-row.me{background:linear-gradient(rgba(253,245,175,.95),rgba(249,231,128,.95));border-top:1px solid rgba(212,168,109,.6)}.lb-medal{-webkit-box-flex:0;flex:none;display:block;width:calc(var(--gw) * .082);height:auto}.lb-rank{-webkit-box-flex:0;flex:none;box-sizing:border-box;width:calc(var(--gw) * .065);height:calc(var(--gw) * .065);margin:0 calc(var(--gw) * .0085);border-radius:50%;display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center;font-size:calc(var(--gw) * .036);font-weight:700;line-height:1;color:#7a5426;background:linear-gradient(#fdf1d2,#f1dcac);border:calc(var(--gw) * .005) solid #d9b57d;box-shadow:inset 0 calc(var(--gw) * .004) 0 rgba(255,255,255,.7)}.lb-rank.mine{color:#fff;background:linear-gradient(#fdb62a,#ef8c05);border-color:#cd7103}.lb-face{-webkit-box-flex:0;flex:none;display:block;width:calc(var(--gw) * .078);height:calc(var(--gw) * .078);margin-left:calc(var(--gw) * .014);border-radius:50%;object-fit:cover;background:#e7e3dd;box-shadow:0 0 0 calc(var(--gw) * .005) rgba(212,168,109,.8)}.lb-name{-webkit-box-flex:1;flex:1 1 auto;min-width:0;margin:0 calc(var(--gw) * .013) 0 calc(var(--gw) * .02);text-align:left;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-pack:center;justify-content:center;overflow:hidden}.lb-name b,.lb-name i{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lb-name b{font-size:calc(var(--gw) * .036);font-weight:700;line-height:1.2;color:#4a3016}.lb-name i{margin-top:calc(var(--gw) * .004);font-style:normal;font-size:calc(var(--gw) * .025);font-weight:400;line-height:1.2;letter-spacing:.02em;color:#9a7a52}.lb-row.me .lb-name b{color:#3e7d18}.lb-row.me .lb-name i{color:#5f8f3c}.lb-you{-webkit-box-flex:0;flex:none;margin-right:calc(var(--gw) * .022);padding:calc(var(--gw) * .008) calc(var(--gw) * .022);border-radius:999px;font-size:calc(var(--gw) * .026);font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1;color:#fff;background:linear-gradient(#5aa832,#3e7d18);box-shadow:0 calc(var(--gw) * .003) 0 rgba(0,0,0,.18)}.lb-score{-webkit-box-flex:0;flex:none;font-size:calc(var(--gw) * .049);font-weight:700;line-height:1;color:#5b3a12}.lb-actions{left:17.25%;right:19.17%;top:73.04%;height:6.42%;display:-webkit-box;display:flex}.lb-actions .rs-btn{padding:0 calc(var(--gw) * .016);-webkit-box-flex:1;flex:1 1 0;height:100%;border-radius:999px;font-size:calc(var(--gw) * .032);letter-spacing:.02em}.lb-actions .rs-home{margin-right:calc(var(--gw) * .0256)}.lb-play{color:#fff;background:linear-gradient(#82b415,#4d8a0c);border:calc(var(--gw) * .0075) solid #3a6a09;box-shadow:inset 0 calc(var(--gw) * .0085) 0 rgba(255,255,255,.32),0 calc(var(--gw) * .0085) 0 rgba(48,88,8,.5);text-shadow:0 calc(var(--gw) * .0032) 0 rgba(0,0,0,.25)}.lb-actions svg{width:calc(var(--gw) * .0383);height:calc(var(--gw) * .0383);margin-right:calc(var(--gw) * .0107)}@font-face{font-family:wenxue;src:url(assets/wenxue.eot);src:url(assets/wenxue.eot),url(assets/wenxue.woff),url(assets/wenxue.ttf),url(assets/wenxue.svg)}.font-wenxue{font-family:Audex,wenxue}.profile{position:absolute;top:0;left:0;width:100%;height:100%}.profile:not(.hide){display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;-webkit-box-pack:center;justify-content:center}.profile .card{position:relative;width:86%}.profile .card-bg{display:block;width:100%}.profile .form{position:absolute;left:11%;right:11%;top:24%;bottom:6.5%;display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;-webkit-box-pack:start;justify-content:flex-start}.profile .form>:last-child{margin-top:auto}.profile .label{font-size:calc(var(--gw) * .038);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a5312;text-shadow:0 1px 0 rgba(255,255,255,.6);margin-bottom:calc(var(--gw) * .022)}.profile .label.spaced{margin-top:calc(var(--gw) * .05);margin-bottom:calc(var(--gw) * .03)}.profile .name-input{display:block;width:100%;box-sizing:border-box;height:calc(var(--gw) * .13);padding:0 calc(var(--gw) * .04);font-family:inherit;font-size:calc(var(--gw) * .056);font-weight:700;text-align:center;color:#5c3a1e;background:#fff6e0;border:calc(var(--gw) * .011) solid #e79a2b;border-radius:calc(var(--gw) * .05);outline:0;-webkit-appearance:none;box-shadow:inset 0 calc(var(--gw) * .008) calc(var(--gw) * .016) rgba(180,120,40,.25)}.profile .row{display:-webkit-box;display:flex;-webkit-box-align:start;align-items:flex-start}.profile .field{-webkit-box-flex:1;flex:1 1 0;min-width:0}.profile .field+.field{margin-left:calc(var(--gw) * .035)}.profile .row .label{font-size:calc(var(--gw) * .032);margin-bottom:calc(var(--gw) * .018)}.profile .row .name-input{height:calc(var(--gw) * .115);padding:0 calc(var(--gw) * .018);font-size:calc(var(--gw) * .04);border-radius:calc(var(--gw) * .045);letter-spacing:-.005em}.profile .row .name-input::-webkit-input-placeholder{font-size:calc(var(--gw) * .04)}.profile .name-input::-webkit-input-placeholder{color:#c8a068;font-weight:400}.profile .name-input:focus{border-color:#d4790f;background:#fffdf5}.profile .avatars{display:-webkit-box;display:flex;flex-wrap:wrap;-webkit-box-pack:center;justify-content:center}.profile .avatar{width:26%;position:relative;margin:0 calc(var(--gw) * .018) calc(var(--gw) * .022);cursor:pointer;-webkit-tap-highlight-color:transparent;opacity:.6;-webkit-filter:saturate(0.5);filter:saturate(.5);-webkit-transition:-webkit-transform .16s ease,opacity .16s ease;transition:transform .16s ease,opacity .16s ease}.profile .avatar img{display:block;width:100%}.profile .avatar.on{opacity:1;-webkit-filter:drop-shadow(0 0 calc(var(--gw) * 0.02) rgba(212,121,15,0.9));filter:drop-shadow(0 0 calc(var(--gw) * .02) rgba(212, 121, 15, .9));-webkit-transform:scale(1.08);transform:scale(1.08)}.profile .go{display:block;width:62%;margin:0 auto;position:relative;top:calc(var(--gw) * .05);cursor:pointer;filter:drop-shadow(0 .03rem .05rem rgba(0, 0, 0, .35))}.profile .go:active{transform:scale(.96)}.shake{-webkit-animation:sk .4s ease-in-out;animation:sk .4s ease-in-out}@-webkit-keyframes sk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6%)}40%,80%{transform:translateX(6%)}}@keyframes sk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6%)}40%,80%{transform:translateX(6%)}}.popIn{-webkit-animation:pi .35s cubic-bezier(.22,1,.36,1);animation:pi .35s cubic-bezier(.22,1,.36,1)}@-webkit-keyframes pi{0%{transform:scale(.7);opacity:0}100%{transform:scale(1);opacity:1}}@keyframes pi{0%{transform:scale(.7);opacity:0}100%{transform:scale(1);opacity:1}}.popOut{-webkit-animation:po .3s ease-in forwards;animation:po .3s ease-in forwards}@-webkit-keyframes po{0%{transform:scale(1);opacity:1}100%{transform:scale(.7);opacity:0}}@keyframes po{0%{transform:scale(1);opacity:1}100%{transform:scale(.7);opacity:0}}.party-fx{position:fixed;left:0;top:0;right:0;bottom:0;z-index:150;pointer-events:none}.party-fx-canvas{position:absolute;left:50%;top:50%;-webkit-transform:translate(-50%,-50%);transform:translate(-50%,-50%)}.party-banner{position:absolute;left:50%;top:22%;-webkit-transform:translateX(-50%);transform:translateX(-50%);display:-webkit-box;display:flex;-webkit-box-align:center;align-items:center;gap:calc(var(--gw) * .03);padding:calc(var(--gw) * .028) calc(var(--gw) * .055);white-space:nowrap;border-radius:999px;background:linear-gradient(#fff6dc,#ffe9ae);border:calc(var(--gw) * .006) solid #d9b57d;box-shadow:0 calc(var(--gw) * .012) calc(var(--gw) * .03) rgba(90,55,10,.35);-webkit-animation:partyIn .5s cubic-bezier(.16,1,.3,1) both;animation:partyIn .5s cubic-bezier(.16,1,.3,1) both}.party-icon{-webkit-box-flex:0;flex:none;width:calc(var(--gw) * .09);height:auto}.party-icon-l{-webkit-animation:partyTilt 1.1s ease-in-out infinite;animation:partyTilt 1.1s ease-in-out infinite}.party-icon-r{-webkit-animation:partyTilt 1.1s ease-in-out infinite reverse;animation:partyTilt 1.1s ease-in-out infinite reverse}.party-text{display:-webkit-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;flex-direction:column;line-height:1.15}.party-text b{font-size:calc(var(--gw) * .058);color:#7a5426}.party-text i{font-style:normal;font-size:calc(var(--gw) * .032);color:#a9702a}.party-out .party-banner{-webkit-animation:partyOut .38s ease-in forwards;animation:partyOut .38s ease-in forwards}@keyframes partyIn{0%{transform:translateX(-50%) scale(.6);opacity:0}100%{transform:translateX(-50%) scale(1);opacity:1}}@keyframes partyOut{0%{transform:translateX(-50%) scale(1);opacity:1}100%{transform:translateX(-50%) scale(.85);opacity:0}}@keyframes partyTilt{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(9deg)}}@media (prefers-reduced-motion:reduce){.party-banner,.party-icon-l,.party-icon-r{-webkit-animation:none;animation:none}}.mode{position:absolute;top:0;left:0;width:100%;height:100%}.mode:not(.hide){display:flex;align-items:center;justify-content:center}.mode .card{position:relative;width:94%}.mode .card-bg{display:block;width:100%}.mode-pick{position:absolute;top:28.65%;width:39%;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .16s ease;filter:drop-shadow(0 .04rem .06rem rgba(0, 0, 0, .28))}.mode-pick[data-mode=blink]{left:5.8%}.mode-pick[data-mode=tap]{left:55.2%}.mode-pick:active{transform:scale(.955)}@media (hover:hover){.mode-pick:hover{transform:translateY(-1.5%) scale(1.025)}}.menu-tools{position:absolute;z-index:5;top:calc(env(safe-area-inset-top,0px) + 12px);left:calc(env(safe-area-inset-left,0px) + 12px);right:calc(env(safe-area-inset-right,0px) + 12px);display:flex;justify-content:space-between;opacity:0;pointer-events:none;transition:opacity .2s ease}.landing.menu-ready .menu-tools{opacity:1;pointer-events:auto}.menu-tool{width:clamp(44px,calc(var(--gw,375px) * .12),54px);height:clamp(44px,calc(var(--gw,375px) * .12),54px);box-sizing:border-box;border-radius:50%;border:3px solid #7a461c;background:linear-gradient(#fff3c8,#f6bd3d);box-shadow:inset 0 3px 0 rgba(255,255,255,.65),0 4px 0 #5d3213,0 7px 14px rgba(71,37,8,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-appearance:none;appearance:none;-webkit-tap-highlight-color:transparent;transition:transform .12s ease,box-shadow .12s ease}.menu-tool img{display:block;width:56%;height:56%}.menu-tool:active{transform:translateY(3px) scale(.97);box-shadow:inset 0 3px 0 rgba(255,255,255,.5),0 1px 0 #5d3213,0 3px 7px rgba(71,37,8,.24)}.menu-tool:focus-visible{outline:3px solid #fff8de;outline-offset:3px}@media (prefers-reduced-motion:reduce){.menu-tool,.menu-tools{transition:none}}</style></head><body><canvas id="canvas" class="hide"></canvas><div class="content"><div class="landing loading"><nav class="menu-tools" aria-label="Game options"><button id="sound-toggle" class="menu-tool" type="button" aria-label="Turn sound off" aria-pressed="true" title="Sound on"><img src="./assets/icon-volume.svg" alt=""></button> <button class="menu-tool js-menu-leaderboard" type="button" aria-label="Open leaderboard" title="Leaderboard"><img src="./assets/icon-trophy.svg" alt=""></button></nav><div class="action-1"><img src="./assets/main-index-title.webp?v=20260811-audio-assets" class="title swing"></div><div class="action-2"><div class="load-panel"><div class="load-head">Loading...</div><div class="bar"><div class="fill"></div><div class="pct">0%</div></div><div class="tip"><i>⇒</i> <b>Tip:</b> Stack cakes higher to earn bigger rewards! <i class="flip">⇒</i></div><div class="load-detail"></div></div><img id="start" src="./assets/main-index-start.webp" class="start hide"></div></div><div id="mode" class="mode hide"><div class="card"><img src="./assets/mode-card.webp" class="card-bg" alt="How will you play?" decoding="async"><img class="mode-pick" data-mode="blink" src="./assets/mode-blink.webp" alt="Play by blinking" decoding="async"><img class="mode-pick" data-mode="tap" src="./assets/mode-tap.webp" alt="Play by tapping" decoding="async"></div></div><div id="profile" class="profile hide"><div class="card"><img src="./assets/profile.webp" class="card-bg" decoding="async"><div class="form"><div class="row"><div class="field"><div class="label">Name</div><input id="player-name" class="name-input" type="text" maxlength="12" placeholder="Your name" autocomplete="off" autocapitalize="words" spellcheck="false"></div><div class="field"><div class="label">Company</div><input id="player-company" class="name-input" type="text" maxlength="16" placeholder="Optional" autocomplete="off" autocapitalize="words" spellcheck="false"></div></div><div><div class="label spaced">Pick Your Avatar</div><div id="avatars" class="avatars"></div></div><img id="profile-go" src="./assets/main-index-start.webp" class="go"></div></div></div><div id="modal" class="modal hide"><div class="mask"></div><div class="js-modal-content modal-content"><div id="over-modal" class="result hide"><img src="./assets/result.webp" class="result-bg" alt="Score summary" decoding="async"><i class="rs-spark a"></i><i class="rs-spark b"></i><div class="rs-score"><div class="rs-score-label">Your Score</div><div id="score" class="rs-score-value">0</div></div><div class="rs-stats"><div class="rs-row"><span class="rs-icon rs-icon-tower"><svg viewBox="0 0 24 24"><circle cx="12" cy="4.4" r="1.6" fill="#fff"/><rect x="8.3" y="6.9" width="7.4" height="3.5" rx="1.2" fill="#fff"/><rect x="5.9" y="11.3" width="12.2" height="3.8" rx="1.3" fill="#fff"/><rect x="3.5" y="16" width="17" height="4" rx="1.4" fill="#fff"/></svg></span><span class="rs-label">Tower Height</span><span class="rs-val"><b id="result-height">0</b><em>Layers</em></span></div><div class="rs-row"><span class="rs-icon rs-icon-best"><svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z" fill="#fff"/></svg></span><span class="rs-label">Best Score</span><span class="rs-val inline"><b id="result-best" class="orange">0</b><i id="result-newbest" class="rs-badge hide">New<br>Best!</i></span></div></div><button type="button" class="rs-btn rs-try js-reload"><svg viewBox="0 0 24 24"><path d="M7 4.3l13.2 7.7L7 19.7z" fill="#fff"/></svg><span>Try Again</span></button><div class="rs-actions"><button type="button" class="rs-btn rs-lead js-leaderboard"><svg viewBox="0 0 24 24"><path d="M7 2.6h10v5.1a5 5 0 0 1-10 0z" fill="#fff"/><path d="M7 4.2H4.2v2.1A3.7 3.7 0 0 0 7.9 10M17 4.2h2.8v2.1A3.7 3.7 0 0 1 16.1 10" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M10.8 12.2h2.4v3.4h-2.4z" fill="#fff"/><rect x="7.4" y="15.6" width="9.2" height="2.8" rx="1.1" fill="#fff"/></svg><span>Leaderboard</span></button><button type="button" class="rs-btn rs-home js-home"><svg viewBox="0 0 24 24"><path d="M12 3.2L2.6 11.1h2.7v9h5.1v-5.6h3.2v5.6h5.1v-9h2.7z" fill="currentColor"/></svg><span>Home</span></button></div></div><div id="board-modal" class="board hide"><img src="./assets/leaderboard.webp" class="board-bg" alt="Leaderboard" decoding="async"><div id="lb-list" class="lb-list"></div><div class="lb-actions"><button type="button" class="rs-btn rs-home js-home"><svg viewBox="0 0 24 24"><path d="M12 3.2L2.6 11.1h2.7v9h5.1v-5.6h3.2v5.6h5.1v-9h2.7z" fill="currentColor"/></svg><span>Home</span></button><button type="button" class="rs-btn lb-play js-reload"><svg viewBox="0 0 24 24"><path d="M7 4.3l13.2 7.7L7 19.7z" fill="#fff"/></svg><span>Play Again</span></button></div></div></div></div></div><script src="./dist/main.js?v=20260811-ios-60-menu"></script><script src="./assets/zepto-1.1.6.min.js"></script><script src="./assets/leaderboard-client.js?v=20260811-profile-dedupe"></script><script src="./assets/celebrate.js"></script><script>var domReady,
+        loadFinish,
+        canvasReady,
+        pageReady,
+        vidReady,
+        loadError,
+        gameStart,
+        game,
+        score,
+        successCount;
+      var gameProgress = 0,
+        pageProgress = 0,
+        vidProgress = 0;
+      var SOUND_KEY = "mangoMania.soundOn";
+      var soundEnabled = true;
       try {
-        localStorage.setItem(BEST_KEY, best)
-      } catch (e) { }
-    }
-    $('#score').text(score)
-    $('#result-height').text(successCount || 0)
-    $('#result-best').text(best)
-    $('#result-newbest')[isBest ? 'removeClass' : 'addClass']('hide')
-    $('#modal').show()
-    $('#over-modal').removeClass('hide')
-
-    // Every run is posted, not just personal bests: the server keeps the play
-    // history and works out the board from it. Fire and forget — the card is
-    // already up, and a failed post parks the run in the client's retry queue.
-    if (window.MangoBoard) {
-      window.MangoBoard.submit(readProfile(), score, successCount || 0, 'tap')
-    }
-  }
-
-  /* Take-the-lead celebration. The mark to beat is read once when the run
-   * starts, so passing it fires the party exactly once, mid-run — the player
-   * sees it while they are still stacking, not on the game-over card. */
-  var chase = window.MangoParty ? new window.MangoParty.Chase() : null
-  var chaseMine = false
-
-  function partyArm() {
-    if (!chase || !window.MangoBoard) return
-    chase.arm(null)
-    window.MangoBoard.leader().then(function (top) {
-      if (!top) return
-      // The top score is the mark to beat whether or not the row is already
-      // this player's. Passing your own record is still the best anyone has
-      // done, and the player who holds first place is the one most likely to
-      // beat it — skipping them meant the party almost never fired.
-      chaseMine = !!top.mine
-      chase.arm(top.score)
-    })
-  }
-
-  function partyCheck(s) {
-    if (!chase || !chase.check(s)) return
-    window.MangoParty.fire(document.getElementById('canvas'), {
-      title: chaseMine ? 'New best!' : 'You are #1!',
-      note: chaseMine
-        ? 'You just beat your own record — still top of the board'
-        : 'Top of the leaderboard — hold on to it',
-      playAudio: function () {
-        if (game && game.playAudio) game.playAudio('celebrate')
+        soundEnabled = localStorage.getItem(SOUND_KEY) !== "0";
+      } catch (e) {}
+      // init window height and width
+      var gameWidth = window.innerWidth;
+      var gameHeight = window.innerHeight;
+      var ratio = 1.5;
+      if (gameHeight / gameWidth < ratio) {
+        gameWidth = Math.ceil(gameHeight / ratio);
       }
-    })
-  }
+      $(".content").css({ height: gameHeight + "px", width: gameWidth + "px" });
+      $(".js-modal-content").css({ width: gameWidth + "px" });
+      // The profile card is sized off the play column, not the viewport, so its
+      // text and avatar chips scale with the card itself on every screen shape.
+      document.documentElement.style.setProperty("--gw", gameWidth + "px");
 
-  // game customization options
-  const option = {
-    width: gameWidth,
-    height: gameHeight,
-    canvasId: 'canvas',
-    soundOn: true,
-    setGameScore: function (s) {
-      score = s
-      partyCheck(s)
-    },
-    setGameSuccess: function (s) {
-      successCount = s
-    },
-    setGameFailed: function (f) {
-      if (f >= 3) overShowOver()
-    },
-    /* The customer's clips report in one at a time. Passed in the option rather
-     * than assigned to the engine afterwards because the videos start loading
-     * inside TowerGame() — by the time it has returned, the first clip may
-     * already have arrived and a hook attached then would miss its tick. */
-    onCustomerProgress: function (done, total) {
-      vidProgress = done / total
-      renderProgress()
-    }
-  }
-
-  // game init with option
-  function gameReady() {
-    game = TowerGame(option)
-    /* The clips are <video>, so game.load() below knows nothing about them and
-     * they need their own arm of the gate. Never rejects and times out on its
-     * own, so this cannot strand the PLAY button; guarded anyway, because an
-     * older bundle in a cache would not have the promise at all. */
-    if (game.customerReady) {
-      game.customerReady.then(function () {
-        vidProgress = 1
-        vidReady = true
-        renderProgress()
-        hideLoading()
-      })
-    } else {
-      vidReady = true
-    }
-    game.load(function () {
-      game.init()
-      // Request music now; TowerGame retries it inside the first real gesture.
-      // Keeping the policy in one place avoids a muted-autoplay/unlock race.
-      game.playBgm()
-    }, updateLoading)
-  }
-
-  var isWechat = navigator.userAgent.toLowerCase().indexOf("micromessenger") !== -1
-  if (isWechat) {
-    document.addEventListener("WeixinJSBridgeReady", gameReady, false)
-  } else {
-    gameReady()
-  }
-
-  function indexHide(done) {
-    $('.landing .action-1').addClass('slideTop')
-    $('.landing .action-2').addClass('slideBottom')
-    setTimeout(function () {
-      $('.landing').hide()
-      // Hand off only once the title and button are actually gone, so the
-      // profile card never shares the screen with the sliding menu.
-      if (done) done()
-    }, 950)
-  }
-
-  // ---- player profile ----------------------------------------------------
-  // Captured once before play and kept in localStorage so the leaderboard has a
-  // name and avatar to attach a score to.
-  var PROFILE_KEY = 'mangoMania.profile'
-  var AVATARS = ['avatar1', 'avatar2', 'avatar3', 'avatar4', 'avatar5', 'avatar6']
-  var pickedAvatar = AVATARS[0]
-
-  function readProfile() {
-    try {
-      return JSON.parse(localStorage.getItem(PROFILE_KEY)) || null
-    } catch (e) {
-      // Private mode / disabled storage: play on without a saved profile.
-      return null
-    }
-  }
-
-  function writeProfile(p) {
-    try {
-      localStorage.setItem(PROFILE_KEY, JSON.stringify(p))
-    } catch (e) { }
-  }
-
-  window.getPlayerProfile = readProfile
-
-  /* Replay marker. Try Again still goes through a page load — the game has no
-   * in-place reset — but it leaves this behind so the fresh page knows to drop
-   * the player straight back into a run instead of showing them the title and
-   * the profile card again. Everything the card would have asked for is already
-   * in localStorage, so there is nothing to re-enter.
-   *
-   * sessionStorage rather than a URL flag: its lifetime is this tab, which is
-   * exactly the lifetime of "I just pressed Try Again". Read once and cleared
-   * immediately, so a manual refresh afterwards lands on the title screen like
-   * any other visit. A profile is required — with nothing saved there would be
-   * no name to put on the board, and the card has to be shown after all.
-   */
-  var REPLAY_KEY = 'mangoMania.replay'
-
-  function takeReplay() {
-    try {
-      if (!sessionStorage.getItem(REPLAY_KEY)) return false
-      sessionStorage.removeItem(REPLAY_KEY)
-    } catch (e) {
-      return false
-    }
-    var p = readProfile()
-    return !!(p && p.name)
-  }
-
-  function markReplay() {
-    try {
-      sessionStorage.setItem(REPLAY_KEY, '1')
-    } catch (e) { }
-  }
-
-  var replay = takeReplay()
-
-  /* ---- control mode -----------------------------------------------------
-   * Tap and blink are two PAGES, not two settings — the blink edition carries
-   * MediaPipe, a worker and a camera, none of which the tap page should pay
-   * for. So choosing is a navigation, and this flag is what survives it: it
-   * says "this load is the second half of a choice already made", which lets
-   * the page skip its own title screen and chooser and open the profile card
-   * directly. Same sessionStorage-once trick as REPLAY_KEY, for the same
-   * reason — a manual refresh afterwards should land on the title screen like
-   * any other visit. */
-  var MODE_KEY = 'mangoMania.mode'
-
-  function takeMode() {
-    try {
-      if (!sessionStorage.getItem(MODE_KEY)) return false
-      sessionStorage.removeItem(MODE_KEY)
-      return true
-    } catch (e) {
-      return false
-    }
-  }
-
-  var modePicked = takeMode()
-
-  function modeShow() {
-    $('#mode').removeClass('hide')
-    $('#mode .card').removeClass('popOut').addClass('popIn')
-  }
-
-  function modeGo(mode) {
-    if (mode === 'blink') {
-      try { sessionStorage.setItem(MODE_KEY, '1') } catch (e) { }
-      window.location.href = '/blink'
-      return
-    }
-    // Tap is this page: no navigation, just carry on to the profile card.
-    $('#mode .card').removeClass('popIn').addClass('popOut')
-    setTimeout(function () {
-      $('#mode').addClass('hide')
-      profileShow()
-    }, 300)
-  }
-
-  function buildAvatars() {
-    var html = ''
-    for (var i = 0; i < AVATARS.length; i += 1) {
-      html += '<div class="avatar" data-avatar="' + AVATARS[i] + '"><img src="./assets/' + AVATARS[i] + '.webp' + ASSET_REV + '" alt="Avatar ' + (i + 1) + '" decoding="async"></div>'
-    }
-    $('#avatars').html(html)
-    $('#avatars .avatar').on('click', function () {
-      pickedAvatar = $(this).attr('data-avatar')
-      $('#avatars .avatar').removeClass('on')
-      $(this).addClass('on')
-    })
-  }
-
-  function selectAvatar(a) {
-    var i = AVATARS.indexOf(a)
-    pickedAvatar = i === -1 ? AVATARS[0] : a
-    $('#avatars .avatar').removeClass('on')
-    $('#avatars .avatar').eq(i === -1 ? 0 : i).addClass('on')
-  }
-
-  function profileShow() {
-    var saved = readProfile()
-    buildAvatars()
-    selectAvatar(saved ? saved.avatar : AVATARS[0])
-    if (saved && saved.name) $('#player-name').val(saved.name)
-    if (saved && saved.company) $('#player-company').val(saved.company)
-    // Toggle the class, not zepto show()/hide(): show() writes an inline
-    // display:block that would override the flex centering on .profile.
-    $('#profile').removeClass('hide')
-    $('#profile .card').removeClass('popOut').addClass('popIn')
-  }
-
-  /* Every button ticks. Delegated from the document rather than bound handler
-   * by handler: the result and leaderboard buttons are in markup that gets shown
-   * and hidden, the avatars are rebuilt from scratch each time the card opens,
-   * and a per-handler call would be one more line to forget on the next button.
-   * Capture phase so the tick starts even if the handler navigates away.
-   *
-   * `game` is checked because #start is clickable while the engine is still
-   * loading, and playClick is only hung on it once the audio is registered. */
-  var CLICKABLE = '#start,#profile-go,.avatar,.rs-btn,.mode-pick'
-  document.addEventListener('click', function (e) {
-    if (!game || !game.playClick) return
-    var el = e.target
-    if (!el || !el.closest || !el.closest(CLICKABLE)) return
-    game.playClick()
-  }, true)
-
-  // click event
-  $('#start').on('click', function () {
-    if (gameStart) return
-    gameStart = true
-    indexHide(modeShow)
-  })
-
-  $('.mode-pick').on('click', function () {
-    modeGo($(this).attr('data-mode'))
-  })
-
-  $('#profile-go').on('click', function () {
-    var name = ($('#player-name').val() || '').replace(/^\s+|\s+$/g, '')
-    if (!name) {
-      // Nudge rather than block silently: the leaderboard needs a name.
-      var $input = $('#player-name')
-      $input.removeClass('shake')
-      setTimeout(function () { $input.addClass('shake') }, 0)
-      $input.focus()
-      return
-    }
-    var company = ($('#player-company').val() || '').replace(/^\s+|\s+$/g, '')
-    writeProfile({
-      name: name, company: company, avatar: pickedAvatar, updatedAt: (+new Date())
-    })
-    $('#player-name').blur()
-    $('#player-company').blur()
-    $('#profile .card').removeClass('popIn').addClass('popOut')
-    setTimeout(function () { $('#profile').addClass('hide') }, 300)
-    setTimeout(game.start, 400)
-    // Read the mark to beat now, while the card is sliding out, so it is in
-    // hand before the first block lands.
-    partyArm()
-  })
-
-  // Enter on the soft keyboard confirms instead of submitting nothing.
-  $('#player-name, #player-company').on('keydown', function (e) {
-    if (e.keyCode === 13) $('#profile-go').trigger('click')
-  })
-
-  // Neither button can restart in place — the game has no reset — so both go
-  // through a page load. What separates them is where that load lands: Try
-  // Again marks the reload as a replay and comes back straight into a run as
-  // the same player, while Home leaves the mark unset and gets the title
-  // screen. The cache-buster is built off pathname, not href, so replaying does
-  // not stack up ?s=...?s=... on the URL.
-  $('.js-reload').on('click', function () {
-    markReplay()
-    window.location.href = window.location.pathname + '?s=' + (+new Date())
-  })
-
-  $('.js-home').on('click', function () {
-    window.location.href = window.location.pathname
-  })
-
-
-  // ---- leaderboard -------------------------------------------------------
-  // Global and real: every row comes from /api/leaderboard, which returns one
-  // entry per player worldwide — their best run — with the caller's own row
-  // already flagged. No filler entries; an empty board says so.
-
-  // The name comes out of a free-text field, so it cannot go into innerHTML raw.
-  function esc(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
-    })
-  }
-
-  // Rows are built exactly the same way for both the live board and the local
-  // fallback: the row builder only cares about name/company/avatar/score/me.
-  function lbRow(e, i) {
-    return '<div class="lb-row' + (e.me ? ' me' : (i === 0 ? ' gold' : '')) + '"'
-      + ' data-key="' + esc(e.key || ('n' + i)) + '">'
-      + (i < 3
-        ? '<img class="lb-medal" src="./assets/medal-' + (i + 1) + '.webp" alt="' + (i + 1) + '" decoding="async">'
-        : '<span class="lb-rank ' + (e.me ? 'mine' : '') + '">' + (i + 1) + '</span>')
-      + '<img class="lb-face" src="./assets/' + e.avatar + '.webp' + ASSET_REV + '" alt="" decoding="async">'
-      + '<span class="lb-name"><b>' + esc(e.name) + '</b>'
-      + (e.company ? '<i>' + esc(e.company) + '</i>' : '') + '</span>'
-      // Outside .lb-name on purpose: in the top three a medal replaces the rank
-      // pill, so the pill's "mine" colour is gone exactly where it matters most.
-      // As a sibling the badge marks the row at every position.
-      + (e.me ? '<span class="lb-you">You</span>' : '')
-      + '<span class="lb-score">' + e.score + '</span>'
-      + '</div>'
-  }
-
-  function lbRows(entries) {
-    var html = ''
-    for (var i = 0; i < entries.length; i += 1) html += lbRow(entries[i], i)
-    return html
-  }
-
-  // Shown in place of rows when there is nothing to rank, or nothing to reach.
-  function lbEmpty(title, note) {
-    return '<div class="lb-empty"><b>' + esc(title) + '</b>'
-      + (note ? esc(note) : '') + '</div>'
-  }
-
-  // Opens on the standings this device saw last, then moves the rows to the
-  // current ones. Showing the shuffle is the point: the player watches
-  // themselves climb past whoever they passed, the way a console board does.
-  function boardRender() {
-    var board = document.getElementById('lb-list')
-    var seen = window.MangoBoard && window.MangoBoard.snapshot()
-    if (seen) $('#lb-list').html(lbRows(seen))
-    else $('#lb-list').html(lbEmpty('Loading the board…'))
-
-    if (!window.MangoBoard) return
-    // Paced on purpose: the old standings hold for a beat so the player reads
-    // them, and only then do the rows move to the new ones.
-    window.MangoBoard.paced(window.MangoBoard.top(20)).then(function (res) {
-      var rows = res && res.leaderboard ? res.leaderboard : null
-      if (!rows) {
-        // Server unreachable and nothing cached: say so rather than sit blank.
-        if (!seen) $('#lb-list').html(lbEmpty('Board unavailable', 'Check your connection and try again.'))
-        return
-      }
-      if (!rows.length) {
-        $('#lb-list').html(lbEmpty('No scores yet', 'Play a round and you will be first on the board.'))
-        window.MangoBoard.remember([])
-        return
+      /* Reveal the PLAY button once the DOM, the engine's assets, the page's own
+       * artwork and the customer's three clips are all in. Guarded by loadFinish
+       * because those arrive on their own clocks and each calls here - running twice
+       * used to be harmless, but the replay branch below starts a run, and a second
+       * pass would drop the title screen on top of it. */
+      function hideLoading() {
+        if (loadFinish || !domReady || !canvasReady || !pageReady || !vidReady)
+          return;
+        $("#canvas").show();
+        loadFinish = true;
+        // Let the bar visibly land on 100% and sit there for the beat before the
+        // button takes its place; stopping at 99% and vanishing reads as a hang.
+        renderProgress();
+        setTimeout(function () {
+          /* A replay never sees the title screen. The engine is loaded and its
+           * loop is running by now - canvasReady is set on the same 100% tick that
+           * fires game.load's callback, a whole second before this - so the run can
+           * be started straight from here. See takeReplay. */
+          if (replay && game) {
+            $(".landing").hide();
+            gameStart = true;
+            game.start();
+            // Same as #profile-go: arm the celebration while the screen is still
+            // settling, so the mark to beat is in hand before the first landing.
+            partyArm();
+            return;
+          }
+          /* Coming back from the other edition, the player has already pressed
+           * START and already chosen - showing them the title screen again would
+           * make them press START twice for one run. Straight to the card. */
+          if (modePicked) {
+            $(".landing").hide();
+            gameStart = true;
+            profileShow();
+            return;
+          }
+          /* Hand .action-2 over from the bar to the PLAY button. The screen around
+           * it - backdrop, logo, its swing - has been up since the first frame and
+           * stays exactly as it is, so this is the only thing that moves. */
+          $(".load-panel").hide();
+          $("#start").removeClass("hide");
+          $(".landing").addClass("menu-ready");
+        }, 600);
       }
 
-      var was = {}, climbers = {}
-      if (seen) {
-        var oldSeat = {}
-        seen.forEach(function (r, i) { oldSeat[r.key] = i })
-        was = window.MangoBoard.positions(board)
-        rows.forEach(function (r, i) {
-          if (oldSeat[r.key] != null && i < oldSeat[r.key]) climbers[r.key] = true
-        })
+      /* The page's own images. The engine's loader never sees these - they are
+       * <img> tags and CSS backgrounds, not sprites - so they are warmed here and
+       * counted into the same bar. decode() rather than plain onload where it
+       * exists: onload means the bytes arrived, decode() means the pixels are ready
+       * to paint, and the difference is exactly the hitch this is here to remove.
+       * A failure counts as done; a missing medal must not strand the gate. */
+      var PAGE_IMAGES = [
+        "background",
+        "main-bg",
+        "main-index-title",
+        "main-index-start",
+        "mode-card",
+        "mode-blink",
+        "mode-tap",
+        "profile",
+        "result",
+        "leaderboard",
+        "medal-1",
+        "medal-2",
+        "medal-3",
+        "avatar1",
+        "avatar2",
+        "avatar3",
+        "avatar4",
+        "avatar5",
+        "avatar6",
+      ];
+      var ASSET_REV = "?v=20260811-audio-assets";
+
+      function pageImageUrl(name) {
+        var resized =
+          name === "main-index-title" || name.indexOf("avatar") === 0;
+        return "./assets/" + name + ".webp" + (resized ? ASSET_REV : "");
       }
-      $('#lb-list').html(lbRows(rows))
-      window.MangoBoard.slide(board, was, climbers)
-      window.MangoBoard.remember(rows)
-    })
-  }
 
-  $('.js-leaderboard').on('click', function () {
-    boardRender()
-    $('#over-modal').addClass('hide')
-    $('#board-modal').removeClass('hide')
-  })
+      /* The sign is already in the markup and already swinging, so it cannot be
+       * waited for like the rest - it has to be faded in where it stands. Its box
+       * is reserved in CSS, so nothing below it moves when it appears. */
+      function revealTitle() {
+        var img = document.querySelector(".landing .title");
+        if (!img) return;
+        var show = function () {
+          img.className += " ready";
+        };
+        if (img.decode) img.decode().then(show, show);
+        else if (img.complete) show();
+        else {
+          img.onload = show;
+          img.onerror = show;
+        }
+      }
 
-  // listener
-  window.addEventListener('load', function () {
-    domReady = true
-    hideLoading()
-  }, false);
+      function preloadPageImages() {
+        revealTitle();
+        var done = 0;
+        function step() {
+          done += 1;
+          pageProgress = done / PAGE_IMAGES.length;
+          renderProgress();
+          if (done === PAGE_IMAGES.length) {
+            pageReady = true;
+            hideLoading();
+          }
+        }
+        PAGE_IMAGES.forEach(function (name) {
+          var img = new Image();
+          img.onerror = step;
+          img.src = pageImageUrl(name);
+          if (img.decode) {
+            img.decode().then(step, step);
+          } else {
+            img.onload = step;
+          }
+        });
+      }
 
-  preloadPageImages()</script><script async src="https://www.googletagmanager.com/gtag/js?id=G-YCWZ8ZDCH2"></script><script>function gtag(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],gtag("js",new Date),gtag("config","G-YCWZ8ZDCH2")</script></body></html>
+      /* One bar, three sources: the engine's assets, the page's artwork and the
+       * customer's clips. The engine's share is the largest because it is the
+       * largest download - audio and every sprite - and because the game cannot
+       * start without it either way. The clips get the smallest share of the three
+       * despite being megabytes each: they stream, so the bar only has to cover the
+       * first playable chunk of each one, not the whole file. */
+      function renderProgress() {
+        var combined =
+          gameProgress * 0.6 + pageProgress * 0.25 + vidProgress * 0.15;
+        var pct = loadFinish ? 100 : Math.min(99, Math.round(combined * 100));
+        $(".loading .pct").text(pct + "%");
+        $(".loading .fill").css({ width: pct + "%" });
+      }
+
+      function updateLoading(status) {
+        var success = status.success;
+        var total = status.total;
+        var failed = status.failed;
+        if (failed > 0 && !loadError) {
+          loadError = true;
+          alert("Network error... Please try again.");
+          return;
+        }
+        gameProgress = total > 0 ? success / total : 0;
+        renderProgress();
+        if (gameProgress >= 1 && !canvasReady) {
+          canvasReady = true;
+          hideLoading();
+        }
+      }
+
+      // ---- game over summary -------------------------------------------------
+      // assets/result.webp carries every static part of the card - banner, heading,
+      // the two empty boxes and the cake - so only the three numbers and the NEW
+      // BEST badge are filled in here. Best score lives in localStorage next to the
+      // profile because Try Again reloads the page.
+      var BEST_KEY = "mangoMania.best";
+
+      function readBest() {
+        try {
+          return parseInt(localStorage.getItem(BEST_KEY), 10) || 0;
+        } catch (e) {
+          return 0;
+        }
+      }
+
+      function overShowOver() {
+        var best = readBest();
+        var isBest = score > best;
+        if (isBest) {
+          best = score;
+          try {
+            localStorage.setItem(BEST_KEY, best);
+          } catch (e) {}
+        }
+        $("#score").text(score);
+        $("#result-height").text(successCount || 0);
+        $("#result-best").text(best);
+        $("#result-newbest")[isBest ? "removeClass" : "addClass"]("hide");
+        $("#modal").show();
+        $("#over-modal").removeClass("hide");
+
+        // Every run is posted, not just personal bests: the server keeps the play
+        // history and works out the board from it. Fire and forget - the card is
+        // already up, and a failed post parks the run in the client's retry queue.
+        if (window.MangoBoard) {
+          window.MangoBoard.submit(
+            readProfile(),
+            score,
+            successCount || 0,
+            "tap"
+          );
+        }
+      }
+
+      /* Take-the-lead celebration. The mark to beat is read once when the run
+       * starts, so passing it fires the party exactly once, mid-run - the player
+       * sees it while they are still stacking, not on the game-over card. */
+      var chase = window.MangoParty ? new window.MangoParty.Chase() : null;
+      var chaseMine = false;
+
+      function partyArm() {
+        if (!chase || !window.MangoBoard) return;
+        chase.arm(null);
+        window.MangoBoard.leader().then(function (top) {
+          if (!top) return;
+          // The top score is the mark to beat whether or not the row is already
+          // this player's. Passing your own record is still the best anyone has
+          // done, and the player who holds first place is the one most likely to
+          // beat it - skipping them meant the party almost never fired.
+          chaseMine = !!top.mine;
+          chase.arm(top.score);
+        });
+      }
+
+      function partyCheck(s) {
+        if (!chase || !chase.check(s)) return;
+        window.MangoParty.fire(document.getElementById("canvas"), {
+          title: chaseMine ? "New best!" : "You are #1!",
+          note: chaseMine
+            ? "You just beat your own record - still top of the board"
+            : "Top of the leaderboard - hold on to it",
+          playAudio: function () {
+            if (game && game.playAudio) game.playAudio("celebrate");
+          },
+        });
+      }
+
+      // game customization options
+      const option = {
+        width: gameWidth,
+        height: gameHeight,
+        canvasId: "canvas",
+        soundOn: true,
+        setGameScore: function (s) {
+          score = s;
+          partyCheck(s);
+        },
+        setGameSuccess: function (s) {
+          successCount = s;
+        },
+        setGameFailed: function (f) {
+          if (f >= 3) overShowOver();
+        },
+        /* The customer's clips report in one at a time. Passed in the option rather
+         * than assigned to the engine afterwards because the videos start loading
+         * inside TowerGame() - by the time it has returned, the first clip may
+         * already have arrived and a hook attached then would miss its tick. */
+        onCustomerProgress: function (done, total) {
+          vidProgress = done / total;
+          renderProgress();
+        },
+      };
+
+      // game init with option
+      function gameReady() {
+        game = TowerGame(option);
+        if (!soundEnabled && game.setSoundOn) game.setSoundOn(false);
+        /* The clips are <video>, so game.load() below knows nothing about them and
+         * they need their own arm of the gate. Never rejects and times out on its
+         * own, so this cannot strand the PLAY button; guarded anyway, because an
+         * older bundle in a cache would not have the promise at all. */
+        if (game.customerReady) {
+          game.customerReady.then(function () {
+            vidProgress = 1;
+            vidReady = true;
+            renderProgress();
+            hideLoading();
+          });
+        } else {
+          vidReady = true;
+        }
+        game.load(function () {
+          game.init();
+          // Request music now; TowerGame retries it inside the first real gesture.
+          // Keeping the policy in one place avoids a muted-autoplay/unlock race.
+          game.playBgm();
+        }, updateLoading);
+      }
+
+      var isWechat =
+        navigator.userAgent.toLowerCase().indexOf("micromessenger") !== -1;
+      if (isWechat) {
+        document.addEventListener("WeixinJSBridgeReady", gameReady, false);
+      } else {
+        gameReady();
+      }
+
+      function indexHide(done) {
+        $(".landing .action-1").addClass("slideTop");
+        $(".landing .action-2").addClass("slideBottom");
+        setTimeout(function () {
+          $(".landing").hide();
+          // Hand off only once the title and button are actually gone, so the
+          // profile card never shares the screen with the sliding menu.
+          if (done) done();
+        }, 950);
+      }
+
+      // ---- player profile ----------------------------------------------------
+      // Captured once before play and kept in localStorage so the leaderboard has a
+      // name and avatar to attach a score to.
+      var PROFILE_KEY = "mangoMania.profile";
+      var AVATARS = [
+        "avatar1",
+        "avatar2",
+        "avatar3",
+        "avatar4",
+        "avatar5",
+        "avatar6",
+      ];
+      var pickedAvatar = AVATARS[0];
+
+      function readProfile() {
+        try {
+          return JSON.parse(localStorage.getItem(PROFILE_KEY)) || null;
+        } catch (e) {
+          // Private mode / disabled storage: play on without a saved profile.
+          return null;
+        }
+      }
+
+      function writeProfile(p) {
+        try {
+          localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
+        } catch (e) {}
+      }
+
+      window.getPlayerProfile = readProfile;
+
+      /* Replay marker. Try Again still goes through a page load - the game has no
+       * in-place reset - but it leaves this behind so the fresh page knows to drop
+       * the player straight back into a run instead of showing them the title and
+       * the profile card again. Everything the card would have asked for is already
+       * in localStorage, so there is nothing to re-enter.
+       *
+       * sessionStorage rather than a URL flag: its lifetime is this tab, which is
+       * exactly the lifetime of "I just pressed Try Again". Read once and cleared
+       * immediately, so a manual refresh afterwards lands on the title screen like
+       * any other visit. A profile is required - with nothing saved there would be
+       * no name to put on the board, and the card has to be shown after all.
+       */
+      var REPLAY_KEY = "mangoMania.replay";
+
+      function takeReplay() {
+        try {
+          if (!sessionStorage.getItem(REPLAY_KEY)) return false;
+          sessionStorage.removeItem(REPLAY_KEY);
+        } catch (e) {
+          return false;
+        }
+        var p = readProfile();
+        return !!(p && p.name);
+      }
+
+      function markReplay() {
+        try {
+          sessionStorage.setItem(REPLAY_KEY, "1");
+        } catch (e) {}
+      }
+
+      var replay = takeReplay();
+
+      /* ---- control mode -----------------------------------------------------
+       * Tap and blink are two PAGES, not two settings - the blink edition carries
+       * MediaPipe, a worker and a camera, none of which the tap page should pay
+       * for. So choosing is a navigation, and this flag is what survives it: it
+       * says "this load is the second half of a choice already made", which lets
+       * the page skip its own title screen and chooser and open the profile card
+       * directly. Same sessionStorage-once trick as REPLAY_KEY, for the same
+       * reason - a manual refresh afterwards should land on the title screen like
+       * any other visit. */
+      var MODE_KEY = "mangoMania.mode";
+
+      function takeMode() {
+        try {
+          if (!sessionStorage.getItem(MODE_KEY)) return false;
+          sessionStorage.removeItem(MODE_KEY);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      var modePicked = takeMode();
+
+      function modeShow() {
+        $("#mode").removeClass("hide");
+        $("#mode .card").removeClass("popOut").addClass("popIn");
+      }
+
+      function modeGo(mode) {
+        if (mode === "blink") {
+          try {
+            sessionStorage.setItem(MODE_KEY, "1");
+          } catch (e) {}
+          window.location.href = "/blink";
+          return;
+        }
+        // Tap is this page: no navigation, just carry on to the profile card.
+        $("#mode .card").removeClass("popIn").addClass("popOut");
+        setTimeout(function () {
+          $("#mode").addClass("hide");
+          profileShow();
+        }, 300);
+      }
+
+      function buildAvatars() {
+        var html = "";
+        for (var i = 0; i < AVATARS.length; i += 1) {
+          html +=
+            '<div class="avatar" data-avatar="' +
+            AVATARS[i] +
+            '"><img src="./assets/' +
+            AVATARS[i] +
+            ".webp" +
+            ASSET_REV +
+            '" alt="Avatar ' +
+            (i + 1) +
+            '" decoding="async"></div>';
+        }
+        $("#avatars").html(html);
+        $("#avatars .avatar").on("click", function () {
+          pickedAvatar = $(this).attr("data-avatar");
+          $("#avatars .avatar").removeClass("on");
+          $(this).addClass("on");
+        });
+      }
+
+      function selectAvatar(a) {
+        var i = AVATARS.indexOf(a);
+        pickedAvatar = i === -1 ? AVATARS[0] : a;
+        $("#avatars .avatar").removeClass("on");
+        $("#avatars .avatar")
+          .eq(i === -1 ? 0 : i)
+          .addClass("on");
+      }
+
+      function profileShow() {
+        var saved = readProfile();
+        buildAvatars();
+        selectAvatar(saved ? saved.avatar : AVATARS[0]);
+        if (saved && saved.name) $("#player-name").val(saved.name);
+        if (saved && saved.company) $("#player-company").val(saved.company);
+        // Toggle the class, not zepto show()/hide(): show() writes an inline
+        // display:block that would override the flex centering on .profile.
+        $("#profile").removeClass("hide");
+        $("#profile .card").removeClass("popOut").addClass("popIn");
+      }
+
+      /* Every button ticks. Delegated from the document rather than bound handler
+       * by handler: the result and leaderboard buttons are in markup that gets shown
+       * and hidden, the avatars are rebuilt from scratch each time the card opens,
+       * and a per-handler call would be one more line to forget on the next button.
+       * Capture phase so the tick starts even if the handler navigates away.
+       *
+       * `game` is checked because #start is clickable while the engine is still
+       * loading, and playClick is only hung on it once the audio is registered. */
+      var CLICKABLE =
+        "#start,#profile-go,.avatar,.rs-btn,.mode-pick,.menu-tool";
+      document.addEventListener(
+        "click",
+        function (e) {
+          if (!game || !game.playClick) return;
+          var el = e.target;
+          if (!el || !el.closest || !el.closest(CLICKABLE)) return;
+          game.playClick();
+        },
+        true
+      );
+
+      // click event
+      $("#start").on("click", function () {
+        if (gameStart) return;
+        gameStart = true;
+        indexHide(modeShow);
+      });
+
+      $(".mode-pick").on("click", function () {
+        modeGo($(this).attr("data-mode"));
+      });
+
+      $("#profile-go").on("click", function () {
+        var name = ($("#player-name").val() || "").replace(/^\s+|\s+$/g, "");
+        if (!name) {
+          // Nudge rather than block silently: the leaderboard needs a name.
+          var $input = $("#player-name");
+          $input.removeClass("shake");
+          setTimeout(function () {
+            $input.addClass("shake");
+          }, 0);
+          $input.focus();
+          return;
+        }
+        var company = ($("#player-company").val() || "").replace(
+          /^\s+|\s+$/g,
+          ""
+        );
+        writeProfile({
+          name: name,
+          company: company,
+          avatar: pickedAvatar,
+          updatedAt: +new Date(),
+        });
+        $("#player-name").blur();
+        $("#player-company").blur();
+        $("#profile .card").removeClass("popIn").addClass("popOut");
+        setTimeout(function () {
+          $("#profile").addClass("hide");
+        }, 300);
+        setTimeout(game.start, 400);
+        // Read the mark to beat now, while the card is sliding out, so it is in
+        // hand before the first block lands.
+        partyArm();
+      });
+
+      // Enter on the soft keyboard confirms instead of submitting nothing.
+      $("#player-name, #player-company").on("keydown", function (e) {
+        if (e.keyCode === 13) $("#profile-go").trigger("click");
+      });
+
+      // Neither button can restart in place - the game has no reset - so both go
+      // through a page load. What separates them is where that load lands: Try
+      // Again marks the reload as a replay and comes back straight into a run as
+      // the same player, while Home leaves the mark unset and gets the title
+      // screen. The cache-buster is built off pathname, not href, so replaying does
+      // not stack up ?s=...?s=... on the URL.
+      $(".js-reload").on("click", function () {
+        if (
+          $(this).closest("#board-modal").length &&
+          $("#modal").attr("data-menu-board") === "1"
+        ) {
+          $("#modal").hide().removeAttr("data-menu-board");
+          $("#board-modal").addClass("hide");
+          $("#start").trigger("click");
+          return;
+        }
+        markReplay();
+        window.location.href = window.location.pathname + "?s=" + +new Date();
+      });
+
+      $(".js-home").on("click", function () {
+        if (
+          $(this).closest("#board-modal").length &&
+          $("#modal").attr("data-menu-board") === "1"
+        ) {
+          $("#modal").hide().removeAttr("data-menu-board");
+          $("#board-modal").addClass("hide");
+          return;
+        }
+        window.location.href = window.location.pathname;
+      });
+
+      function updateSoundButton() {
+        var button = document.getElementById("sound-toggle");
+        var icon = button.querySelector("img");
+        button.setAttribute("aria-pressed", soundEnabled ? "true" : "false");
+        button.setAttribute(
+          "aria-label",
+          soundEnabled ? "Turn sound off" : "Turn sound on"
+        );
+        button.title = soundEnabled ? "Sound on" : "Sound off";
+        icon.src = soundEnabled
+          ? "./assets/icon-volume.svg"
+          : "./assets/icon-volume-off.svg";
+      }
+
+      updateSoundButton();
+      $("#sound-toggle").on("click", function () {
+        soundEnabled = !soundEnabled;
+        try {
+          localStorage.setItem(SOUND_KEY, soundEnabled ? "1" : "0");
+        } catch (e) {}
+        if (game && game.setSoundOn) game.setSoundOn(soundEnabled);
+        updateSoundButton();
+      });
+
+      // ---- leaderboard -------------------------------------------------------
+      // Global and real: every row comes from /api/leaderboard, which returns one
+      // entry per player worldwide - their best run - with the caller's own row
+      // already flagged. No filler entries; an empty board says so.
+
+      // The name comes out of a free-text field, so it cannot go into innerHTML raw.
+      function esc(s) {
+        return String(s).replace(/[&<>"]/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+        });
+      }
+
+      // Rows are built exactly the same way for both the live board and the local
+      // fallback: the row builder only cares about name/company/avatar/score/me.
+      function lbRow(e, i) {
+        return (
+          '<div class="lb-row' +
+          (e.me ? " me" : i === 0 ? " gold" : "") +
+          '"' +
+          ' data-key="' +
+          esc(e.key || "n" + i) +
+          '">' +
+          (i < 3
+            ? '<img class="lb-medal" src="./assets/medal-' +
+              (i + 1) +
+              '.webp" alt="' +
+              (i + 1) +
+              '" decoding="async">'
+            : '<span class="lb-rank ' +
+              (e.me ? "mine" : "") +
+              '">' +
+              (i + 1) +
+              "</span>") +
+          '<img class="lb-face" src="./assets/' +
+          e.avatar +
+          ".webp" +
+          ASSET_REV +
+          '" alt="" decoding="async">' +
+          '<span class="lb-name"><b>' +
+          esc(e.name) +
+          "</b>" +
+          (e.company ? "<i>" + esc(e.company) + "</i>" : "") +
+          "</span>" +
+          // Outside .lb-name on purpose: in the top three a medal replaces the rank
+          // pill, so the pill's "mine" colour is gone exactly where it matters most.
+          // As a sibling the badge marks the row at every position.
+          (e.me ? '<span class="lb-you">You</span>' : "") +
+          '<span class="lb-score">' +
+          e.score +
+          "</span>" +
+          "</div>"
+        );
+      }
+
+      function lbRows(entries) {
+        var html = "";
+        for (var i = 0; i < entries.length; i += 1)
+          html += lbRow(entries[i], i);
+        return html;
+      }
+
+      // Shown in place of rows when there is nothing to rank, or nothing to reach.
+      function lbEmpty(title, note) {
+        return (
+          '<div class="lb-empty"><b>' +
+          esc(title) +
+          "</b>" +
+          (note ? esc(note) : "") +
+          "</div>"
+        );
+      }
+
+      // Opens on the standings this device saw last, then moves the rows to the
+      // current ones. Showing the shuffle is the point: the player watches
+      // themselves climb past whoever they passed, the way a console board does.
+      function boardRender() {
+        var board = document.getElementById("lb-list");
+        var seen = window.MangoBoard && window.MangoBoard.snapshot();
+        if (seen) $("#lb-list").html(lbRows(seen));
+        else $("#lb-list").html(lbEmpty("Loading the board…"));
+
+        if (!window.MangoBoard) return;
+        // Paced on purpose: the old standings hold for a beat so the player reads
+        // them, and only then do the rows move to the new ones.
+        window.MangoBoard.paced(window.MangoBoard.top(20)).then(function (res) {
+          var rows = res && res.leaderboard ? res.leaderboard : null;
+          if (!rows) {
+            // Server unreachable and nothing cached: say so rather than sit blank.
+            if (!seen)
+              $("#lb-list").html(
+                lbEmpty(
+                  "Board unavailable",
+                  "Check your connection and try again."
+                )
+              );
+            return;
+          }
+          if (!rows.length) {
+            $("#lb-list").html(
+              lbEmpty(
+                "No scores yet",
+                "Play a round and you will be first on the board."
+              )
+            );
+            window.MangoBoard.remember([]);
+            return;
+          }
+
+          var was = {},
+            climbers = {};
+          if (seen) {
+            var oldSeat = {};
+            seen.forEach(function (r, i) {
+              oldSeat[r.key] = i;
+            });
+            was = window.MangoBoard.positions(board);
+            rows.forEach(function (r, i) {
+              if (oldSeat[r.key] != null && i < oldSeat[r.key])
+                climbers[r.key] = true;
+            });
+          }
+          $("#lb-list").html(lbRows(rows));
+          window.MangoBoard.slide(board, was, climbers);
+          window.MangoBoard.remember(rows);
+        });
+      }
+
+      $(".js-leaderboard").on("click", function () {
+        boardRender();
+        $("#board-modal .lb-play span").text("Play Again");
+        $("#over-modal").addClass("hide");
+        $("#board-modal").removeClass("hide");
+      });
+
+      $(".js-menu-leaderboard").on("click", function () {
+        boardRender();
+        $("#board-modal .lb-play span").text("Play");
+        $("#modal").attr("data-menu-board", "1").show();
+        $("#over-modal").addClass("hide");
+        $("#board-modal").removeClass("hide");
+      });
+
+      // listener
+      window.addEventListener(
+        "load",
+        function () {
+          domReady = true;
+          hideLoading();
+        },
+        false
+      );
+
+      preloadPageImages();</script><script async src="https://www.googletagmanager.com/gtag/js?id=G-YCWZ8ZDCH2"></script><script>function gtag() {
+        dataLayer.push(arguments);
+      }
+      ((window.dataLayer = window.dataLayer || []),
+        gtag("js", new Date()),
+        gtag("config", "G-YCWZ8ZDCH2"));</script></body></html>

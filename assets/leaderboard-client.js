@@ -56,6 +56,41 @@
       .then(function (v) { clearTimeout(timer); return v; });
   }
 
+  function normalized(v) {
+    return String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  function identity(row) {
+    return [normalized(row.name), normalized(row.company), row.avatar || 'avatar1'].join('\u001f');
+  }
+
+  /* Old snapshots can still contain one row from each Vercel hostname. Keep
+   * the best score for a visible profile and carry YOU across from any lower
+   * duplicate, so cached data cannot briefly recreate the server-side bug. */
+  function dedupe(rows) {
+    var out = [];
+    var seats = {};
+    (rows || []).forEach(function (row) {
+      var id = identity(row);
+      var at = seats[id];
+      if (at === undefined) {
+        seats[id] = out.length;
+        out.push(Object.assign({}, row));
+        return;
+      }
+      var old = out[at];
+      var mine = !!old.me || !!row.me;
+      if ((Number(row.score) || 0) > (Number(old.score) || 0)) {
+        out[at] = Object.assign({}, row, { me: mine });
+      } else {
+        old.me = mine;
+      }
+    });
+    out.sort(function (a, b) { return (Number(b.score) || 0) - (Number(a.score) || 0); });
+    out.forEach(function (row, i) { row.rank = i + 1; });
+    return out;
+  }
+
   /* A run finished while the network was down is still a real score. It parks in
    * localStorage and rides along with the next successful submit. */
   function queue(body) {
@@ -136,7 +171,12 @@
       return ask('/api/leaderboard?limit=' + (limit || 20)
         + '&me=' + encodeURIComponent(deviceId())
         + '&meName=' + encodeURIComponent((p && p.name) || '')
-        + '&meCompany=' + encodeURIComponent((p && p.company) || ''));
+        + '&meCompany=' + encodeURIComponent((p && p.company) || '')
+        + '&meAvatar=' + encodeURIComponent((p && p.avatar) || 'avatar1'))
+        .then(function (res) {
+          if (res && res.leaderboard) res.leaderboard = dedupe(res.leaderboard);
+          return res;
+        });
     },
 
     /* The score sitting at the top of the board right now, and whether it is
@@ -169,13 +209,14 @@
       try {
         var raw = localStorage.getItem(SNAP_KEY);
         var rows = raw ? JSON.parse(raw) : null;
+        rows = rows && rows.length ? dedupe(rows) : null;
         return rows && rows.length ? rows : null;
       } catch (e) { return null; }
     },
 
     remember: function (rows) {
       try {
-        localStorage.setItem(SNAP_KEY, JSON.stringify((rows || []).map(function (r) {
+        localStorage.setItem(SNAP_KEY, JSON.stringify(dedupe(rows).map(function (r) {
           return {
             key: r.key, name: r.name, company: r.company,
             avatar: r.avatar, score: r.score, me: r.me
@@ -258,6 +299,8 @@
       });
       return at;
     },
+
+    dedupe: dedupe,
   };
 
   w.MangoBoard = MangoBoard;

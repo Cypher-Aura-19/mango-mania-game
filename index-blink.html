@@ -2,7 +2,7 @@
 <html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
-<title>Tower Building — Blink Edition</title>
+<title>Tower Building - Blink Edition</title>
 <link rel="icon" type="image/x-icon" href="./assets/favicon.png">
 <link rel="preload" href="./assets/background.webp" as="image" fetchpriority="high">
 <style>
@@ -132,7 +132,7 @@
      assets/result.webp is the whole static card: banner, heading, the two
      empty boxes and the cake. Everything below is an overlay positioned as a
      percentage of that art, so the numbers stay welded to their boxes at any
-     size. The percentages come straight out of the PNG — the content column
+     size. The percentages come straight out of the PNG - the content column
      runs 13.96%-84.96% of its width, the score box 27.21%-50.46% and the
      stats box 53.58%-68.03% of its height. */
   .result { position: relative; width: 98%; }
@@ -144,7 +144,7 @@
   .rs-score-value { margin-top: calc(var(--gw) * .0128); font-size: calc(var(--gw) * .1332); white-space: nowrap; font-weight: 700; line-height: 1; color: #4f2e08; }
 
   /* The two gold sparkles the mock puts left of the score. Square boxes cut to
-     a four-point star — the art has none baked in. */
+     a four-point star - the art has none baked in. */
   .rs-spark { background: #ffc531; -webkit-clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
   .rs-spark.a { left: 14.4%; top: 34.6%; width: 4.4%; padding-bottom: 4.4%; }
   .rs-spark.b { left: 15.6%; top: 41.4%; width: 3.1%; padding-bottom: 3.1%; }
@@ -188,7 +188,7 @@
      stay in place at any screen size.
 
      The percentages are measured off the PNG (1043x1508) after mapping the
-     approved mock through the shared landmarks — the panel's inner orange
+     approved mock through the shared landmarks - the panel's inner orange
      border (x 128.5..889.5, y 190..1241) sits in the same pixels in both.
      Note the panel is NOT centred in its own canvas (its centre is 48.8%),
      which is why the left and right insets differ. */
@@ -238,7 +238,7 @@
   .lb-row.me .lb-name i { color: #5f8f3c; }
   /* Marks the player's own row wherever it sits. The row tint alone reads as
    * "highlighted", not as "you", and on a shared laptop several people know
-   * each other's names — the badge is the part that says which one is yours. */
+   * each other's names - the badge is the part that says which one is yours. */
   .lb-you { flex: none; margin-right: calc(var(--gw) * .022); padding: calc(var(--gw) * .008) calc(var(--gw) * .022); border-radius: 999px; font-size: calc(var(--gw) * .026); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; line-height: 1; color: #fff; background: linear-gradient(#5aa832, #3e7d18); box-shadow: 0 calc(var(--gw) * .003) 0 rgba(0, 0, 0, .18); }
   .lb-score { flex: none; font-size: calc(var(--gw) * .049); font-weight: 700; line-height: 1; color: #5b3a12; }
   .lb-actions { left: 17.25%; right: 19.17%; top: 73.04%; height: 6.42%; display: flex; }
@@ -255,7 +255,7 @@
   .font-wenxue { font-family: Audex, wenxue; }
 
   /* ============================================================
-     INVISIBLE WEBCAM — used ONLY for blink detection.
+     INVISIBLE WEBCAM - used ONLY for blink detection.
      Never visible to the user: pushed 9999px off-screen to the left.
      IMPORTANT: we do NOT use opacity:0 / z-index:-1 behind opaque
      content, because browsers stop delivering video frames for
@@ -273,7 +273,7 @@
   }
 
   /* ============================================================
-     TINY CONNECTION DOT — shows blink-control state only.
+     TINY CONNECTION DOT - shows blink-control state only.
      Green pulse : face detected, blink ready
      Yellow      : blink engine ready, waiting for your face
      Red         : blink unavailable (camera/model), tap only
@@ -288,8 +288,8 @@
     border-radius: 50%;
     background: #ff5252;
     /* A neutral ring plus a normal elevation shadow, not a coloured halo. The
-       dot sits over whatever backdrop art is on screen — bright sky through to
-       deep space — so it needs contrast on any hue; a white ring gives that at
+       dot sits over whatever backdrop art is on screen - bright sky through to
+       deep space - so it needs contrast on any hue; a white ring gives that at
        every state, where a glow in the dot's own colour would vanish against a
        backdrop of the same colour. */
     box-shadow: 0 0 0 2px rgba(255,255,255,.92), 0 1px 3px rgba(0,0,0,.4);
@@ -309,7 +309,7 @@
      Sized off --gw (the canvas width set in JS) rather than the viewport, so
      the text and avatar chips scale with the card itself on every screen. */
   .profile { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-  /* Scoped to :not(.hide) because .hide is declared earlier in this sheet —
+  /* Scoped to :not(.hide) because .hide is declared earlier in this sheet -
      a bare display:flex here has equal specificity and would win the cascade,
      leaving the card on screen from page load. */
   .profile:not(.hide) { display: flex; align-items: center; justify-content: center; }
@@ -339,7 +339,7 @@
   .profile .name-input:focus { border-color: #d4790f; background: #fffdf5; }
   .profile .avatars { display: flex; flex-wrap: wrap; justify-content: center; }
   /* The avatar art ships with its own gold circular frame, so no chip styling
-     here — selection is shown by lifting the sprite out of a dimmed row. */
+     here - selection is shown by lifting the sprite out of a dimmed row. */
   .profile .avatar { width: 26%; position: relative; margin: 0 calc(var(--gw) * .018) calc(var(--gw) * .022); cursor: pointer; -webkit-tap-highlight-color: transparent; opacity: .6; filter: saturate(.5); transition: transform .16s ease, opacity .16s ease; }
   .profile .avatar img { display: block; width: 100%; }
   .profile .avatar.on { opacity: 1; filter: drop-shadow(0 0 calc(var(--gw) * .02) rgba(212,121,15,.9)); transform: scale(1.08); }
@@ -351,7 +351,7 @@
   .profile .blink-tip { font-size: calc(var(--gw) * .032); color: #a9702a; margin-top: calc(var(--gw) * .02); }
   /* ---- control-mode chooser ---------------------------------------------
      Same stock as the profile card, so picking how you play and typing your
-     name read as one step. The two illustrations ARE the buttons —
+     name read as one step. The two illustrations ARE the buttons -
      mode-card.webp is only the frame around them, and these three percentages
      come straight out of tools/make-mode-cards.py. Height is left to the image
      so the artwork can never letterbox. */
@@ -374,7 +374,7 @@
   /* ============================================================
      TAKE-THE-LEAD CELEBRATION
      Fires mid-run the moment the player's score passes the top of
-     the board. Sits over the game canvas and takes no input — the
+     the board. Sits over the game canvas and takes no input - the
      player is still stacking underneath it.
      ============================================================ */
   .party-fx { position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 150; pointer-events: none; }
@@ -393,6 +393,17 @@
   @media (prefers-reduced-motion: reduce) {
     .party-banner, .party-icon-l, .party-icon-r { animation: none; }
   }
+
+  /* Compact menu utilities, using the same cream, mango and wood treatment as
+     the game's cards. Icon drawings are local Tabler assets so the buttons stay
+     sharp without adding another font or runtime dependency. */
+  .menu-tools { position: absolute; z-index: 5; top: calc(env(safe-area-inset-top, 0px) + 12px); left: calc(env(safe-area-inset-left, 0px) + 12px); right: calc(env(safe-area-inset-right, 0px) + 12px); display: flex; justify-content: space-between; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+  .landing.menu-ready .menu-tools { opacity: 1; pointer-events: auto; }
+  .menu-tool { width: clamp(44px, calc(var(--gw, 375px) * .12), 54px); height: clamp(44px, calc(var(--gw, 375px) * .12), 54px); box-sizing: border-box; border-radius: 50%; border: 3px solid #7a461c; background: linear-gradient(#fff3c8, #f6bd3d); box-shadow: inset 0 3px 0 rgba(255,255,255,.65), 0 4px 0 #5d3213, 0 7px 14px rgba(71,37,8,.3); display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-appearance: none; appearance: none; -webkit-tap-highlight-color: transparent; transition: transform .12s ease, box-shadow .12s ease; }
+  .menu-tool img { display: block; width: 56%; height: 56%; }
+  .menu-tool:active { transform: translateY(3px) scale(.97); box-shadow: inset 0 3px 0 rgba(255,255,255,.5), 0 1px 0 #5d3213, 0 3px 7px rgba(71,37,8,.24); }
+  .menu-tool:focus-visible { outline: 3px solid #fff8de; outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { .menu-tools, .menu-tool { transition: none; } }
 </style>
 </head>
 <body>
@@ -404,6 +415,14 @@
          the progress panel until every asset, the blink model and the camera
          are in, at which point it holds the PLAY button instead. -->
     <div class="landing loading">
+      <nav class="menu-tools" aria-label="Game options">
+        <button id="sound-toggle" class="menu-tool" type="button" aria-label="Turn sound off" aria-pressed="true" title="Sound on">
+          <img src="./assets/icon-volume.svg" alt="">
+        </button>
+        <button class="menu-tool js-menu-leaderboard" type="button" aria-label="Open leaderboard" title="Leaderboard">
+          <img src="./assets/icon-trophy.svg" alt="">
+        </button>
+      </nav>
       <div class="action-1"><img src="./assets/main-index-title.webp?v=20260811-audio-assets" class="title swing"></div>
       <div class="action-2">
         <div class="load-panel">
@@ -447,7 +466,7 @@
           </div>
           <div>
             <img id="profile-go" src="./assets/main-index-start.webp" class="go">
-            <div class="blink-tip">Blink drops the cake — tap the buttons</div>
+            <div class="blink-tip">Blink drops the cake - tap the buttons</div>
           </div>
         </div>
       </div>
@@ -510,24 +529,24 @@
     </div>
   </div>
 
-  <!-- Invisible webcam feed (blink monitoring only — never displayed) -->
+  <!-- Invisible webcam feed (blink monitoring only - never displayed) -->
   <video id="webcam" autoplay playsinline muted width="320" height="240"></video>
 
   <!-- Tiny connection state dot -->
   <div id="blinkDot" class="connecting"></div>
 
   <!-- Tower game bundle (exposes window.TowerGame) -->
-  <script src="./dist/main.js?v=20260811-overhang-geometry"></script>
+  <script src="./dist/main.js?v=20260811-ios-60-menu"></script>
 
   <!-- Global leaderboard client (exposes window.MangoBoard) -->
-  <script src="./assets/leaderboard-client.js"></script>
+  <script src="./assets/leaderboard-client.js?v=20260811-profile-dedupe"></script>
 
   <!-- Take-the-lead celebration (exposes window.MangoParty) -->
   <script src="./assets/celebrate.js"></script>
 
   <script type="module">
   /* ============================================================
-     CONFIG — identical to the working blink POC
+     CONFIG - identical to the working blink POC
      ============================================================ */
   const WASM_PATH = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
   const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
@@ -562,7 +581,7 @@
   const loadWarn    = document.getElementById('loadWarn');
   const blinkDot    = document.getElementById('blinkDot');
 
-  // Audio unlock state — see unlockAudio() below.
+  // Audio unlock state - see unlockAudio() below.
   let audioUnlocked = false;
 
   /* ============================================================
@@ -580,7 +599,7 @@
   let lastFaceSeenTime = 0;
   let prevEar = 1;                // last EAR sample, for close-velocity detection
 
-  // Dot state cache — only touch the DOM when it actually changes
+  // Dot state cache - only touch the DOM when it actually changes
   let lastDotState = '';
 
   // Loading progress (0..1 each; combined for the bar)
@@ -600,6 +619,10 @@
   // Game
   let game = null;
   let gameStart = false;
+  const SOUND_KEY = 'mangoMania.soundOn';
+  let soundEnabled = (() => {
+    try { return localStorage.getItem(SOUND_KEY) !== '0'; } catch (e) { return true; }
+  })();
   /* gameStart means "the player has left the title screen"; runStarted means
    * "there is a run to drop a block into". They used to be close enough to
    * share a flag, but the mode chooser and the profile card both sit in the
@@ -619,7 +642,7 @@
 
   // Browser autoplay policies block sound until a real user gesture (click,
   // tap, keypress, or a granted media permission). The blink edition is played
-  // hands-free — blinks are NOT user gestures — so on its own the page never
+  // hands-free - blinks are NOT user gestures - so on its own the page never
   // unlocks audio: no music, no drop sounds. The camera permission grant IS a
   // user gesture, so we unlock all audio the moment the stream goes live (and
   // again on any click/tap/key) instead of waiting for a click that never comes.
@@ -652,7 +675,7 @@
      * swallowed by the autoplay policy.
      *
      * The mute has to be UNDONE, and that is the whole trick. Warming used to
-     * set muted=true, start the clip and walk away — which worked, in the sense
+     * set muted=true, start the clip and walk away - which worked, in the sense
      * that the element was unblocked, and failed completely, in the sense that
      * it stayed muted for the rest of the session. Game over was silent in this
      * edition for exactly that reason while the tap page, which never warms
@@ -663,7 +686,7 @@
      * without this the first play could start mid-clip.
      *
      * The list is every effect the engine owns, not just the four that used to
-     * be here — there is no reason for `land` to be treated differently from
+     * be here - there is no reason for `land` to be treated differently from
      * `drop`, and a partial list is how this bug got missed. */
     [
       'drop-perfect', 'drop', 'game-over', 'rotate', 'click',
@@ -747,7 +770,7 @@
     else if (!cameraOk && !cameraDenied) detail = 'Waiting for camera permission…';
     else if (cameraDenied) {
       detail = 'Ready (tap/click to play)';
-      warn = '⚠ Camera blocked — blink control off, use tap/click';
+      warn = '⚠ Camera blocked - blink control off, use tap/click';
     } else detail = 'Ready';
 
     loadDetail.textContent = detail;
@@ -862,7 +885,7 @@
         return;
       }
       /* Coming back from the other edition, the player has already pressed
-       * START and already chosen — showing them the title screen again would
+       * START and already chosen - showing them the title screen again would
        * make them press START twice for one run. Straight to the card. */
       if (modePicked) {
         landingEl.classList.add('hide');
@@ -872,14 +895,15 @@
       }
       loadPanel.classList.add('hide');
       startBtn.classList.remove('hide');
+      landingEl.classList.add('menu-ready');
     }, 600);
   }
 
   /* ============================================================
-     BLINK DETECTION (invisible — no video, no overlay, no HUD)
+     BLINK DETECTION (invisible - no video, no overlay, no HUD)
      ============================================================ */
   // Fires the action the moment the eye STARTS closing (2-frame confirm),
-  // so the block drops instantly at the blink's beginning — no waiting
+  // so the block drops instantly at the blink's beginning - no waiting
   // for the eye to reopen. A short cooldown prevents double-triggers.
   function processEar(avgEar, now) {
     // Velocity: how fast the eye is closing since the last sample (positive = closing).
@@ -887,7 +911,7 @@
     prevEar = avgEar;
     if (eyeState === 'OPEN') {
       // Fire on EITHER a full close (EAR under threshold) OR a fast downward
-      // velocity while already dipping — the latter catches the very ONSET of
+      // velocity while already dipping - the latter catches the very ONSET of
       // a quick blink, so the drop triggers as your eyes START to close, not
       // after they've shut. avgEar<0.30 gate stops wide-open jitter firing.
       const fastClosing = closingSpeed > 0.045 && avgEar < 0.30;
@@ -909,8 +933,8 @@
 
   /* A confirmed blink drops the block. That is ALL it does.
    *
-   * It used to press buttons too — START on the landing screen, GO on the
-   * profile card — which read as helpful but meant a player could not blink
+   * It used to press buttons too - START on the landing screen, GO on the
+   * profile card - which read as helpful but meant a player could not blink
    * while reading, picking an avatar or reaching for the keyboard without the
    * screen moving under them. Menus are for clicking; the blink is the tap
    * replacement, and a tap only ever drops a cake. Anything before the run
@@ -924,7 +948,7 @@
 
   // The main thread does almost nothing here: it grabs a small camera frame
   // and ships it to the Web Worker. ALL MediaPipe inference happens off-thread,
-  // so the game's render loop is never blocked — smooth as the tap version.
+  // so the game's render loop is never blocked - smooth as the tap version.
   function detectTick() {
     /* Once a block has been released, another blink cannot do useful work until
      * the next block is swinging. Stop camera bitmap uploads/inference during
@@ -947,7 +971,7 @@
   }
 
   // Handle results coming back from the worker (runs on the main thread, but
-  // only does the tiny EAR state machine + a dot update — microseconds).
+  // only does the tiny EAR state machine + a dot update - microseconds).
   function onWorkerMessage(e) {
     const msg = e.data;
     if (msg.type === 'ready') {
@@ -963,7 +987,7 @@
     if (msg.type === 'error') {
       console.error('[Blink] Worker failed:', msg.message);
       modelDone = true; modelProgress = 1;
-      loadWarn.textContent = '⚠ Blink engine failed to load — tap/click to play';
+      loadWarn.textContent = '⚠ Blink engine failed to load - tap/click to play';
       renderProgress();
       checkAllReady();
       return;
@@ -1029,7 +1053,7 @@
       };
       document.addEventListener('click', retryCam);
       document.addEventListener('touchstart', retryCam);
-      cameraDenied = true; // temporary — hint says "tap to enable blink"
+      cameraDenied = true; // temporary - hint says "tap to enable blink"
     }
     updateBlinkReadiness();
     renderProgress();
@@ -1037,10 +1061,10 @@
   }
 
   /* ============================================================
-     BLINK MODEL — now lives entirely in a Web Worker so inference
+     BLINK MODEL - now lives entirely in a Web Worker so inference
      never touches the main (render) thread. The worker imports the
      MediaPipe module from the CDN, loads the model, and for each frame
-     returns just { face, avgEar } — no landmark arrays cross threads.
+     returns just { face, avgEar } - no landmark arrays cross threads.
      ============================================================ */
   function buildWorkerSource() {
     // NOTE: this runs as a CLASSIC worker (not a module worker): MediaPipe
@@ -1121,7 +1145,7 @@
     blinkWorker.onerror = (err) => {
       console.error('[Blink] Worker error:', err.message);
       modelDone = true; modelProgress = 1;
-      loadWarn.textContent = '⚠ Blink engine failed to load — tap/click to play';
+      loadWarn.textContent = '⚠ Blink engine failed to load - tap/click to play';
       renderProgress();
       checkAllReady();
     };
@@ -1147,7 +1171,7 @@
   document.documentElement.style.setProperty('--gw', gameWidth + 'px');
 
   /* Take-the-lead celebration. The mark to beat is read once when the run
-   * starts, so passing it fires the party exactly once, mid-run — the player
+   * starts, so passing it fires the party exactly once, mid-run - the player
    * sees it while they are still stacking, not on the game-over card. */
   const chase = window.MangoParty ? new window.MangoParty.Chase() : null;
   let chaseMine = false;
@@ -1160,7 +1184,7 @@
       // The top score is the mark to beat whether or not the row is already
       // this player's. Passing your own record is still the best anyone has
       // done, and the player who holds first place is the one most likely to
-      // beat it — skipping them meant the party almost never fired.
+      // beat it - skipping them meant the party almost never fired.
       chaseMine = !!top.mine;
       chase.arm(top.score);
     });
@@ -1171,8 +1195,8 @@
     window.MangoParty.fire(document.getElementById('canvas'), {
       title: chaseMine ? 'New best!' : 'You are #1!',
       note: chaseMine
-        ? 'You just beat your own record — still top of the board'
-        : 'Top of the leaderboard — hold on to it',
+        ? 'You just beat your own record - still top of the board'
+        : 'Top of the leaderboard - hold on to it',
       playAudio: () => game && game.playAudio && game.playAudio('celebrate'),
     });
   }
@@ -1192,7 +1216,7 @@
     },
     /* The customer's clips report in one at a time. Passed in the option rather
      * than assigned to the engine afterwards because the videos start loading
-     * inside TowerGame() — by the time it has returned, the first clip may
+     * inside TowerGame() - by the time it has returned, the first clip may
      * already have arrived and a hook attached then would miss its tick. */
     onCustomerProgress: (done, total) => {
       vidProgress = done / total;
@@ -1229,7 +1253,7 @@
     document.getElementById('over-modal').classList.remove('hide');
 
     // Every run is posted, not just personal bests: the server keeps the play
-    // history and works out the board from it. Fire and forget — the card is
+    // history and works out the board from it. Fire and forget - the card is
     // already up, and a failed post parks the run in the client's retry queue.
     if (window.MangoBoard) {
       window.MangoBoard.submit(readProfile(), score, successCount || 0, 'blink');
@@ -1269,8 +1293,8 @@
 
   window.getPlayerProfile = readProfile;
 
-  /* Replay marker. Try Again still goes through a page load — the game has no
-   * in-place reset — but it leaves this behind so the fresh page knows to drop
+  /* Replay marker. Try Again still goes through a page load - the game has no
+   * in-place reset - but it leaves this behind so the fresh page knows to drop
    * the player straight back into a run instead of showing them the title and
    * the profile card again. Everything the card would have asked for is already
    * in localStorage, so there is nothing to re-enter.
@@ -1278,7 +1302,7 @@
    * sessionStorage rather than a URL flag: its lifetime is this tab, which is
    * exactly the lifetime of "I just pressed Try Again". Read once and cleared
    * immediately, so a manual refresh afterwards lands on the title screen like
-   * any other visit. A profile is required — with nothing saved there would be
+   * any other visit. A profile is required - with nothing saved there would be
    * no name to put on the board, and the card has to be shown after all.
    *
    * Read here, at module scope, rather than inside finishLoading: PROFILE_KEY
@@ -1306,13 +1330,13 @@
   const replay = takeReplay();
 
   /* ---- control mode -----------------------------------------------------
-   * Tap and blink are two PAGES, not two settings — the blink edition carries
+   * Tap and blink are two PAGES, not two settings - the blink edition carries
    * MediaPipe, a worker and a camera, none of which the tap page should pay
    * for. So choosing is a navigation, and this flag is what survives it: it
    * says "this load is the second half of a choice already made", which lets
    * the page skip its own title screen and chooser and open the profile card
    * directly. Same sessionStorage-once trick as REPLAY_KEY, for the same
-   * reason — a manual refresh afterwards should land on the title screen like
+   * reason - a manual refresh afterwards should land on the title screen like
    * any other visit. */
   const MODE_KEY = 'mangoMania.mode';
 
@@ -1423,6 +1447,7 @@
 
   function initGame() {
     game = TowerGame(option);
+    if (!soundEnabled && game.setSoundOn) game.setSoundOn(false);
     /* This page is a module, so `game` is module-scoped and nothing outside can
      * reach it -- unlike the tap page, whose classic script puts it on window for
      * free. Exposed deliberately so the smoke tests can read the engine's own
@@ -1468,7 +1493,7 @@
    *
    * `game` is checked because #start is clickable while the engine is still
    * loading, and playClick is only hung on it once the audio is registered. */
-  const CLICKABLE = '#start,#profile-go,.avatar,.rs-btn,.mode-pick';
+  const CLICKABLE = '#start,#profile-go,.avatar,.rs-btn,.mode-pick,.menu-tool';
   document.addEventListener('click', (e) => {
     if (!game || !game.playClick) return;
     const el = e.target;
@@ -1492,24 +1517,54 @@
     });
   });
 
-  // Neither button can restart in place — the game has no reset — so both go
+  // Neither button can restart in place - the game has no reset - so both go
   // through a page load. What separates them is where that load lands: Try
   // Again marks the reload as a replay and comes back straight into a run as
   // the same player, while Home leaves the mark unset and gets the title screen.
   document.querySelectorAll('.js-reload').forEach((el) => el.addEventListener('click', () => {
+    if (el.closest('#board-modal') && modalEl.getAttribute('data-menu-board') === '1') {
+      modalEl.classList.add('hide');
+      modalEl.removeAttribute('data-menu-board');
+      document.getElementById('board-modal').classList.add('hide');
+      startBtn.click();
+      return;
+    }
     markReplay();
     window.location.href = window.location.pathname + '?s=' + (+new Date());
   }));
 
   document.querySelectorAll('.js-home').forEach((el) => el.addEventListener('click', () => {
+    if (el.closest('#board-modal') && modalEl.getAttribute('data-menu-board') === '1') {
+      modalEl.classList.add('hide');
+      modalEl.removeAttribute('data-menu-board');
+      document.getElementById('board-modal').classList.add('hide');
+      return;
+    }
     window.location.href = window.location.pathname;
   }));
+
+  function updateSoundButton() {
+    const button = document.getElementById('sound-toggle');
+    const icon = button.querySelector('img');
+    button.setAttribute('aria-pressed', soundEnabled ? 'true' : 'false');
+    button.setAttribute('aria-label', soundEnabled ? 'Turn sound off' : 'Turn sound on');
+    button.title = soundEnabled ? 'Sound on' : 'Sound off';
+    icon.src = soundEnabled ? './assets/icon-volume.svg' : './assets/icon-volume-off.svg';
+  }
+
+  updateSoundButton();
+  document.getElementById('sound-toggle').addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    try { localStorage.setItem(SOUND_KEY, soundEnabled ? '1' : '0'); } catch (e) { }
+    if (game && game.setSoundOn) game.setSoundOn(soundEnabled);
+    updateSoundButton();
+  });
 
   // ---- leaderboard -------------------------------------------------------
   // Global: the board comes from /api/leaderboard, which returns one row per
   // player worldwide with the caller's own row already flagged.
   //
-  // Real scores only — there is no house table to pad the board out. An empty
+  // Real scores only - there is no house table to pad the board out. An empty
   // database shows an empty board, because a player who beats a name that was
   // never a person has not actually beaten anyone.
 
@@ -1589,13 +1644,23 @@
 
   document.querySelector('.js-leaderboard').addEventListener('click', () => {
     boardRender();
+    document.querySelector('#board-modal .lb-play span').textContent = 'Play Again';
+    document.getElementById('over-modal').classList.add('hide');
+    document.getElementById('board-modal').classList.remove('hide');
+  });
+
+  document.querySelector('.js-menu-leaderboard').addEventListener('click', () => {
+    boardRender();
+    document.querySelector('#board-modal .lb-play span').textContent = 'Play';
+    modalEl.setAttribute('data-menu-board', '1');
+    modalEl.classList.remove('hide');
     document.getElementById('over-modal').classList.add('hide');
     document.getElementById('board-modal').classList.remove('hide');
   });
 
 
   /* ============================================================
-     INIT — everything happens during the loading screen
+     INIT - everything happens during the loading screen
      ============================================================ */
   async function init() {
     // 1) Start blink model + camera + game assets in parallel
@@ -1603,7 +1668,7 @@
       console.error('[Blink] Model load failed:', e);
       modelDone = true;
       modelProgress = 1;
-      loadWarn.textContent = '⚠ Blink engine failed to load — tap/click to play';
+      loadWarn.textContent = '⚠ Blink engine failed to load - tap/click to play';
       renderProgress();
       checkAllReady();
     });

@@ -110,15 +110,20 @@ ready.catch((err) => {
   console.error('[db] schema setup failed:', err && err.message);
 });
 
-/* The leaderboard: one row per player, their best run, ties broken by who got
- * there first. MAX(score) with a bare GROUP BY would leave the other columns
- * unspecified, so the window function picks the actual winning row. */
+/* The public board treats a normalized visible profile as one person. Device
+ * ids remain in storage because shared phones can host several players, but a
+ * hostname rename creates a new localStorage origin and therefore a new device
+ * id for the same name/company/avatar. This partition folds those legacy rows
+ * together while retaining every underlying run. */
 const LEADERBOARD = `
   SELECT pid, name, company, avatar, score, layers, played_at, plays
     FROM (
       SELECT p.id AS pid, p.name, p.company, p.avatar, s.score, s.layers, s.played_at,
-             COUNT(*) OVER (PARTITION BY p.id) AS plays,
-             ROW_NUMBER() OVER (PARTITION BY p.id
+             COUNT(*) OVER (
+               PARTITION BY lower(trim(p.name)), lower(trim(p.company)), p.avatar
+             ) AS plays,
+             ROW_NUMBER() OVER (
+               PARTITION BY lower(trim(p.name)), lower(trim(p.company)), p.avatar
                                 ORDER BY s.score DESC, s.played_at ASC) AS seat
         FROM scores s JOIN players p ON p.id = s.player_id
     )
@@ -153,9 +158,14 @@ const SQL = {
               FROM scores s JOIN players p ON p.id = s.player_id
              ORDER BY s.played_at DESC, s.id DESC`,
   rank: `SELECT COUNT(*) + 1 AS rank FROM (
-           SELECT MAX(score) AS best FROM scores GROUP BY player_id
+           SELECT MAX(s.score) AS best
+             FROM scores s JOIN players p ON p.id = s.player_id
+            GROUP BY lower(trim(p.name)), lower(trim(p.company)), p.avatar
          ) WHERE best > ?`,
-  totals: `SELECT (SELECT COUNT(*) FROM players) AS players,
+  totals: `SELECT (SELECT COUNT(*) FROM (
+                    SELECT 1 FROM players
+                     GROUP BY lower(trim(name)), lower(trim(company)), avatar
+                  )) AS players,
                   (SELECT COUNT(*) FROM scores)  AS runs`,
 };
 

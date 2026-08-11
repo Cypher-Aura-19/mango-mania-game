@@ -10,6 +10,7 @@
  * carry device ids.
  */
 const express = require('express');
+const crypto = require('crypto');
 const { q, recordScore } = require('./db');
 const csv = require('./csv');
 
@@ -55,6 +56,15 @@ setInterval(() => {
 
 function text(v, max) {
   return typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '';
+}
+
+function profileIdentity(name, company, avatar) {
+  return [text(name, 40).toLowerCase(), text(company, 40).toLowerCase(),
+    AVATARS.has(avatar) ? avatar : 'avatar1'].join('\u001f');
+}
+
+function publicKey(identity) {
+  return 'i' + crypto.createHash('sha1').update(identity).digest('hex').slice(0, 16);
 }
 
 function guard(req, res, next) {
@@ -129,24 +139,24 @@ router.post('/score', async (req, res) => {
  * The internal player id is resolved here and dropped from the response. */
 router.get('/leaderboard', wrap(async (req, res) => {
   const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 20));
-  const mine = req.query.me
-    ? await q.findPlayer(String(req.query.me), text(req.query.meName, 40),
-      text(req.query.meCompany, 40))
-    : null;
-  const rows = (await q.board(limit)).map((r, i) => ({
-    rank: i + 1,
-    // Stable across reorders, so the client can animate a row from its old
-    // rank to its new one. The internal id never leaves as anything else.
-    key: 'p' + r.pid,
-    name: r.name,
-    company: r.company,
-    avatar: r.avatar,
-    score: r.score,
-    layers: r.layers,
-    plays: r.plays,
-    played_at: r.played_at,
-    me: !!mine && r.pid === mine.id,
-  }));
+  const mine = req.query.me && req.query.meName
+    ? profileIdentity(req.query.meName, req.query.meCompany, req.query.meAvatar)
+    : '';
+  const rows = (await q.board(limit)).map((r, i) => {
+    const identity = profileIdentity(r.name, r.company, r.avatar);
+    return {
+      rank: i + 1,
+      key: publicKey(identity),
+      name: r.name,
+      company: r.company,
+      avatar: r.avatar,
+      score: r.score,
+      layers: r.layers,
+      plays: r.plays,
+      played_at: r.played_at,
+      me: !!mine && identity === mine,
+    };
+  });
   res.json({ leaderboard: rows, ...await q.totals() });
 }));
 

@@ -105,6 +105,10 @@ export const createAppleAudio = () => {
       delete active[name]
       try { record.source.stop() } catch (e) { /* already ended */ }
       try { record.source.disconnect(); record.gain.disconnect() } catch (e) { /* already disconnected */ }
+    },
+    stopAll() {
+      Object.keys(pending).forEach(name => { delete pending[name] })
+      Object.keys(active).forEach(name => mixer.stop(name))
     }
   }
 
