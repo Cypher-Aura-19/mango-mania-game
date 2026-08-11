@@ -29,10 +29,9 @@ let creamSeq = 0
 // trimming only the completely-transparent rows still left those soft ramps
 // being drawn, and two semi-transparent edges stacked on each other let the
 // background show through as a hairline seam. Cut to the solid body so every
-// floor has a hard top and bottom edge. block-perfect.webp has no padding.
+// floor has a hard top and bottom edge.
 const TEX_PAD = {
-  block: { top: 66 / 1705, bottom: 35 / 1705 },
-  'block-perfect': { top: 0, bottom: 0 }
+  block: { top: 66 / 1705, bottom: 35 / 1705 }
 }
 
 // Vertical source rect for a block texture, skipping its transparent padding.
@@ -74,7 +73,7 @@ const SWING_SCALE = 1
  * All source-rect clipping still works because it is ratio-based. */
 export const prepareBlockTextures = (engine) => {
   const target = Math.max(2, Math.ceil(engine.getVariable(constant.blockWidth) * 1.12))
-  ;['block', 'block-perfect', 'blockRope'].forEach((name) => {
+  ;['block', 'blockRope'].forEach((name) => {
     const source = engine.getImg(name)
     if (!source || !source.width || source._displaySized) return
     const canvas = document.createElement('canvas')
@@ -363,7 +362,6 @@ const applyLand = (engine, block, line, opts) => {
    * once the hook is fast, and play() on an element already playing is silent. */
   playSfx(engine, 'land')
   if (isPerfect) {
-    i.perfect = true
     addScore(engine, true)
     engine.playAudio('drop-perfect')
   } else {
@@ -566,7 +564,7 @@ export const blockAction = (instance, engine, time) => {
         i.tipDir = (blockLeft + instance.width / 2) > ((line.x + line.collisionX) / 2) ? 1 : -1
         i.tipRig = false
       } else if (collision === 5) {
-        // perfect: full-width stack, no clip, bonus + texture
+        // perfect: full-width stack, no clip, and the normal bonus
         i.status = constant.land
         instance.y = blockY
         applyLand(engine, instance, line, {
@@ -735,8 +733,9 @@ const drawSwingBlock = (instance, engine) => {
 }
 
 const drawBlock = (instance, engine) => {
-  const { perfect } = instance
-  const imgName = perfect ? 'block-perfect' : 'block'
+  // A perfect landing is a scoring result, not a different cake. Keeping one
+  // texture prevents the layer changing artwork the instant it touches down.
+  const imgName = 'block'
   const bl = engine.getImg(imgName)
   const { ctx } = engine
   // Skip the texture's transparent top/bottom padding so stacked layers meet

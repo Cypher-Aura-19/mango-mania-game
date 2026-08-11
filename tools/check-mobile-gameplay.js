@@ -87,6 +87,7 @@ async function run(rate) {
       : -1
     return {
       gap: Math.abs(b.y - line.y),
+      blockTextureStable: !b.perfect && !g.getImg('block-perfect'),
       dropElapsed: g.getVariable('GAME_TIME') - b.dropBeganAt,
       fallPlayed: mixer
         ? (mixer.playCounts.fall || 0) > window.__mobileAudio.fall
@@ -135,6 +136,7 @@ async function main() {
     && r.mid.audioUnlocked
     && r.mid.fallAudible
     && r.landed.gap <= 1
+    && r.landed.blockTextureStable
     && r.landed.dropElapsed > 350
     && r.landed.fallPlayed
     && r.landed.landPlayed

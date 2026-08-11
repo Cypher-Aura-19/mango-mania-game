@@ -20,7 +20,7 @@ from PIL import Image
 
 NAMES = [
     # engine sprites (src/index.js)
-    'hook', 'block-rope', 'block', 'block-perfect', 'balloon',
+    'hook', 'block-rope', 'block', 'balloon',
     'c4', 'c5', 'c6', 'c7', 'c8',
     'f1', 'f4', 'f6', 'f7',
     'tutorial', 'tutorial-arrow', 'mango',

@@ -105,7 +105,6 @@ window.TowerGame = (option = {}) => {
   game.addImg('hook', pathGenerator('hook.webp'))
   game.addImg('blockRope', pathGenerator('block-rope.webp'))
   game.addImg('block', pathGenerator('block.webp'))
-  game.addImg('block-perfect', pathGenerator('block-perfect.webp'))
   /* Sky decor. c1..c3 were the plain white clouds and are no longer used, so
    * only the mango-space props are registered. They are painted straight into
    * the backdrop tiles now rather than drifting as sprites — see the decor
