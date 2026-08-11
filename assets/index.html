@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time JS Canvas Background Keyer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0c;
+            --card-bg: rgba(20, 20, 25, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --font-main: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        .bg-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            transition: all 0.5s ease;
+        }
+
+        .bg-dark {
+            background-color: #0b0c10;
+        }
+
+        .bg-gradient {
+            background: linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #0f172a 100%);
+        }
+
+        .bg-grid {
+            background-color: #0c0e14;
+            background-image: 
+                radial-gradient(at 50% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+        }
+
+        .bg-red {
+            background: linear-gradient(135deg, #450a0a 0%, #1e0505 100%);
+        }
+
+        #particleCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        header {
+            width: 100%;
+            max-width: 1200px;
+            padding: 2.5rem 1.5rem 1rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #818cf8, #c084fc, #e879f9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            font-weight: 300;
+        }
+
+        main {
+            width: 100%;
+            max-width: 1200px;
+            padding: 1rem 1.5rem 3rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            flex-grow: 1;
+        }
+
+        .controls-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        select, button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-family: var(--font-main);
+            font-size: 0.95rem;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        select:hover, button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            border: 1px solid transparent;
+            font-weight: 600;
+            box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            background: #4f46e5;
+            transform: translateY(-1px);
+        }
+
+        .toggle-group {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.25rem;
+            border-radius: 10px;
+            border: 1px solid var(--card-border);
+        }
+
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .toggle-btn.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        }
+
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.8rem;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-badge {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            padding: 0.25rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .preview-viewport {
+            width: 100%;
+            aspect-ratio: 9/16;
+            max-height: 550px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background-color: #2a2a2a;
+            background-image: 
+                linear-gradient(45deg, #1d1d1d 25%, transparent 25%, transparent 75%, #1d1d1d 75%, #1d1d1d), 
+                linear-gradient(45deg, #1d1d1d 25%, transparent 25%, transparent 75%, #1d1d1d 75%, #1d1d1d);
+            background-size: 30px 30px;
+            background-position: 0 0, 15px 15px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        video, canvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            z-index: 2;
+        }
+
+        .hud-overlay {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.5rem 0.8rem;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #ff4545;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-transparent {
+            color: #4ade80;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            flex-grow: 1;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            box-shadow: 0 0 6px var(--accent-glow);
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Target BG Container -->
+    <div id="bgWrapper" class="bg-container bg-grid"></div>
+
+    <!-- Particle Layer -->
+    <canvas id="particleCanvas"></canvas>
+
+    <header>
+        <h1>Real-time HTML5 Canvas Morphological Keyer</h1>
+        <div class="subtitle">Dynamically removing white outlines and trapped background spaces in Javascript</div>
+    </header>
+
+    <main>
+        <!-- Controls -->
+        <section class="controls-panel">
+            <div class="control-group">
+                <span class="control-label">Select Original Video</span>
+                <select id="videoSelect">
+                    <option value="watching.mp4">watching.mp4 (White BG)</option>
+                    <option value="angry.mp4">angry.mp4 (White BG)</option>
+                    <option value="watching (1).mp4">watching (1).mp4 (White BG)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <span class="control-label">Playback</span>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button id="playBtn" class="btn-primary">Play</button>
+                    <button id="loopBtn">Loop: ON</button>
+                </div>
+            </div>
+
+            <div class="control-group" style="flex-grow: 0.5;">
+                <span class="control-label">Keyer Tolerance</span>
+                <div class="slider-group">
+                    <div class="slider-container">
+                        <input type="range" id="toleranceRange" min="10" max="100" value="80">
+                    </div>
+                    <span id="toleranceVal" style="font-family: monospace; font-size: 0.95rem; width: 2.5rem; text-align: right;">80</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <span class="control-label">Demonstration Background</span>
+                <div class="toggle-group" id="bgToggler">
+                    <button class="toggle-btn active" data-bg="bg-grid">Tech Grid</button>
+                    <button class="toggle-btn" data-bg="bg-gradient">Sunset Glow</button>
+                    <button class="toggle-btn" data-bg="bg-red">Dark Red</button>
+                    <button class="toggle-btn" data-bg="bg-dark">Vantablack</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Viewports -->
+        <section class="workspace-grid">
+            
+            <!-- Direct Video Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #ff4545;"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                        <span>Original Video Tag (Source)</span>
+                    </div>
+                    <span class="card-badge" style="color: #ff4545; background: rgba(255, 69, 69, 0.1);">With White BG</span>
+                </div>
+                <div class="preview-viewport">
+                    <video id="mainVideo" muted playsinline loop>
+                        <source src="watching.mp4" type="video/mp4">
+                    </video>
+                    <div class="hud-overlay" id="videoHud">FPS: 30 | Opaque White BG</div>
+                </div>
+            </div>
+
+            <!-- Canvas Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #4ade80;"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"/><path d="M12 18C15.3137 18 18 15.3137 18 12C18 8.68629 15.3137 6 12 6C8.68629 6 6 8.68629 6 12C6 15.3137 8.68629 18 12 18Z"/></svg>
+                        <span>Canvas Keyed Output</span>
+                    </div>
+                    <span class="card-badge hud-transparent" style="background: rgba(74, 222, 128, 0.15);">Keyed Transparent</span>
+                </div>
+                <div class="preview-viewport">
+                    <canvas id="outputCanvas"></canvas>
+                    <div class="hud-overlay hud-transparent" id="canvasHud">Morphological Dilation Flood Fill</div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Offscreen Canvases for Downsampled Keying -->
+    <canvas id="offscreenSource" style="display:none;"></canvas>
+    <canvas id="offscreenMask" style="display:none;"></canvas>
+
+    <script>
+        const video = document.getElementById('mainVideo');
+        const canvas = document.getElementById('outputCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const sourceOff = document.getElementById('offscreenSource');
+        const sourceCtx = sourceOff.getContext('2d');
+        const maskOff = document.getElementById('offscreenMask');
+        const maskCtx = maskOff.getContext('2d');
+        
+        const videoSelect = document.getElementById('videoSelect');
+        const playBtn = document.getElementById('playBtn');
+        const loopBtn = document.getElementById('loopBtn');
+        const toleranceRange = document.getElementById('toleranceRange');
+        const toleranceVal = document.getElementById('toleranceVal');
+        const bgWrapper = document.getElementById('bgWrapper');
+        const bgToggler = document.getElementById('bgToggler');
+        
+        const videoHud = document.getElementById('videoHud');
+        const canvasHud = document.getElementById('canvasHud');
+        
+        let isLooping = true;
+        let animationFrameId = null;
+        
+        // Downsample dimensions for fast BFS/Dilation processing in Javascript
+        const maskW = 180;
+        const maskH = 320;
+        
+        // Memory pre-allocations
+        const nearWhite = new Uint8Array(maskW * maskH);
+        const dilated = new Uint8Array(maskW * maskH);
+        const flooded = new Uint8Array(maskW * maskH);
+        const queue = new Int32Array(maskW * maskH * 2);
+
+        // Sync tolerance slider
+        toleranceRange.addEventListener('input', () => {
+            toleranceVal.textContent = toleranceRange.value;
+            if (video.paused) {
+                renderFrame();
+            }
+        });
+
+        // 1. Sync dropdown and video source
+        videoSelect.addEventListener('change', () => {
+            const selectedSource = videoSelect.value;
+            const wasPlaying = !video.paused;
+            
+            video.src = selectedSource;
+            video.load();
+            
+            video.addEventListener('loadeddata', function onLoaded() {
+                if (wasPlaying) {
+                    video.play();
+                } else {
+                    renderFrame(); // Draw initial frame
+                }
+                video.removeEventListener('loadeddata', onLoaded);
+            });
+        });
+
+        // 2. Play / Pause logic
+        playBtn.addEventListener('click', () => {
+            if (video.paused) {
+                video.play();
+                playBtn.textContent = 'Pause';
+                playBtn.style.backgroundColor = '#ef4444';
+            } else {
+                video.pause();
+                playBtn.textContent = 'Play';
+                playBtn.style.backgroundColor = 'var(--accent)';
+            }
+        });
+
+        // 3. Loop toggle
+        loopBtn.addEventListener('click', () => {
+            isLooping = !isLooping;
+            video.loop = isLooping;
+            loopBtn.textContent = isLooping ? 'Loop: ON' : 'Loop: OFF';
+            loopBtn.style.borderColor = isLooping ? 'rgba(255, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.4)';
+        });
+
+        // 4. Update canvas size on video metadata load
+        video.addEventListener('loadedmetadata', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            sourceOff.width = maskW;
+            sourceOff.height = maskH;
+            maskOff.width = maskW;
+            maskOff.height = maskH;
+            
+            videoHud.textContent = `Resolution: ${video.videoWidth}x${video.videoHeight} | H.264 MP4`;
+            renderFrame();
+        });
+
+        // 5. Morphological Dilation & BFS Flood Fill Keying
+        function renderFrame() {
+            if (canvas.width === 0 || canvas.height === 0) return;
+            
+            // Draw original video frame directly on the main canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Downsample frame to offscreen source canvas
+            sourceCtx.drawImage(video, 0, 0, maskW, maskH);
+            const sourceImgData = sourceCtx.getImageData(0, 0, maskW, maskH);
+            const sourceData = sourceImgData.data;
+            
+            // Create a fresh ImageData buffer for the output mask
+            const maskImgData = maskCtx.createImageData(maskW, maskH);
+            const maskData = maskImgData.data;
+            
+            const tol = parseInt(toleranceRange.value);
+            const bgR = 255, bgG = 255, bgB = 255;
+            
+            // 1. Create nearWhite binary mask
+            nearWhite.fill(0);
+            for (let i = 0; i < maskW * maskH; i++) {
+                const idx = i * 4;
+                const r = sourceData[idx];
+                const g = sourceData[idx+1];
+                const b = sourceData[idx+2];
+                // L1 distance to flat white
+                if (Math.abs(r - bgR) <= tol && Math.abs(g - bgG) <= tol && Math.abs(b - bgB) <= tol) {
+                    nearWhite[i] = 1;
+                }
+            }
+            
+            // 2. Dilate nearWhite mask to eat up thin ropes (using a 5x5 kernel, radius=2)
+            // This connects the enclosed spaces to the main background
+            dilated.fill(0);
+            const radius = 2;
+            for (let y = 0; y < maskH; y++) {
+                for (let x = 0; x < maskW; x++) {
+                    const idx = y * maskW + x;
+                    if (nearWhite[idx] === 1) {
+                        const yStart = Math.max(0, y - radius);
+                        const yEnd = Math.min(maskH - 1, y + radius);
+                        const xStart = Math.max(0, x - radius);
+                        const xEnd = Math.min(maskW - 1, x + radius);
+                        for (let ny = yStart; ny <= yEnd; ny++) {
+                            for (let nx = xStart; nx <= xEnd; nx++) {
+                                dilated[ny * maskW + nx] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 3. Flood Fill from the borders on the dilated mask
+            flooded.fill(0);
+            let qHead = 0;
+            let qTail = 0;
+            
+            function isBgDilated(x, y) {
+                return dilated[y * maskW + x] === 1;
+            }
+            
+            // Seed borders
+            for (let x = 0; x < maskW; x++) {
+                if (isBgDilated(x, 0) && flooded[x] === 0) { flooded[x] = 1; queue[qTail++] = x; queue[qTail++] = 0; }
+                if (isBgDilated(x, maskH - 1) && flooded[(maskH - 1) * maskW + x] === 0) { flooded[(maskH - 1) * maskW + x] = 1; queue[qTail++] = x; queue[qTail++] = maskH - 1; }
+            }
+            for (let y = 1; y < maskH - 1; y++) {
+                if (isBgDilated(0, y) && flooded[y * maskW] === 0) { flooded[y * maskW] = 1; queue[qTail++] = 0; queue[qTail++] = y; }
+                if (isBgDilated(maskW - 1, y) && flooded[y * maskW + (maskW - 1)] === 0) { flooded[y * maskW + (maskW - 1)] = 1; queue[qTail++] = maskW - 1; queue[qTail++] = y; }
+            }
+            
+            // BFS loop
+            const dx = [1, -1, 0, 0];
+            const dy = [0, 0, 1, -1];
+            
+            while (qHead < qTail) {
+                const cx = queue[qHead++];
+                const cy = queue[qHead++];
+                
+                for (let i = 0; i < 4; i++) {
+                    const nx = cx + dx[i];
+                    const ny = cy + dy[i];
+                    
+                    if (nx >= 0 && nx < maskW && ny >= 0 && ny < maskH) {
+                        const nIdx = ny * maskW + nx;
+                        if (flooded[nIdx] === 0 && dilated[nIdx] === 1) {
+                            flooded[nIdx] = 1;
+                            queue[qTail++] = nx;
+                            queue[qTail++] = ny;
+                        }
+                    }
+                }
+            }
+            
+            // 4. Intersect flooded mask with original nearWhite mask to restore exact shape edges
+            for (let i = 0; i < maskW * maskH; i++) {
+                const idx = i * 4;
+                if (flooded[i] === 1 && nearWhite[i] === 1) {
+                    maskData[idx] = 255;
+                    maskData[idx+1] = 255;
+                    maskData[idx+2] = 255;
+                    maskData[idx+3] = 255; // Background mask
+                } else {
+                    maskData[idx] = 0;
+                    maskData[idx+1] = 0;
+                    maskData[idx+2] = 0;
+                    maskData[idx+3] = 0;   // Character and details
+                }
+            }
+            
+            // Write mask to offscreen mask canvas
+            maskCtx.putImageData(maskImgData, 0, 0);
+            
+            // Subtract the background mask from the main canvas
+            ctx.globalCompositeOperation = 'destination-out';
+            
+            // Enable smooth scaling to automatically feather the mask edges
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // Draw upscaled mask
+            ctx.drawImage(maskOff, 0, 0, canvas.width, canvas.height);
+            
+            // Reset composition mode
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // 6. Canvas Animation loop
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+        let currentFps = 30;
+
+        function canvasLoop(now) {
+            frameCount++;
+            if (now - lastFrameTime >= 1000) {
+                currentFps = frameCount;
+                frameCount = 0;
+                lastFrameTime = now;
+                canvasHud.textContent = `JS Keyer FPS: ${currentFps} | tolerance: ${toleranceRange.value}`;
+            }
+
+            renderFrame();
+            animationFrameId = requestAnimationFrame(canvasLoop);
+        }
+
+        video.addEventListener('play', () => {
+            if (!animationFrameId) {
+                lastFrameTime = performance.now();
+                frameCount = 0;
+                canvasLoop(performance.now());
+            }
+        });
+
+        video.addEventListener('pause', () => {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        });
+
+        // 7. Background selector
+        bgToggler.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                bgToggler.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const bgClass = btn.getAttribute('data-bg');
+                bgWrapper.className = 'bg-container ' + bgClass;
+            });
+        });
+
+        // 8. Particle effect script for the background
+        const pCanvas = document.getElementById('particleCanvas');
+        const pCtx = pCanvas.getContext('2d');
+
+        let particles = [];
+
+        function resizeParticleCanvas() {
+            pCanvas.width = window.innerWidth;
+            pCanvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resizeParticleCanvas);
+        resizeParticleCanvas();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * pCanvas.width;
+                this.y = Math.random() * pCanvas.height;
+                this.size = Math.random() * 2.5 + 0.5;
+                this.speedX = Math.random() * 0.4 - 0.2;
+                this.speedY = Math.random() * -0.5 - 0.1;
+                this.alpha = Math.random() * 0.5 + 0.1;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.y < 0) {
+                    this.y = pCanvas.height;
+                    this.x = Math.random() * pCanvas.width;
+                }
+            }
+
+            draw() {
+                pCtx.fillStyle = `rgba(129, 140, 248, ${this.alpha})`;
+                pCtx.beginPath();
+                pCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                pCtx.fill();
+            }
+        }
+
+        for (let i = 0; i < 60; i++) {
+            particles.push(new Particle());
+        }
+
+        function animateParticles() {
+            pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // Load initial state
+        video.load();
+        
+        video.addEventListener('loadeddata', () => {
+            renderFrame();
+        });
+    </script>
+</body>
+</html>

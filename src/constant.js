@@ -6,7 +6,7 @@ export const hardMode = 'HARD_MODE'
  * portrait COLUMN of it — the same 1:1.5 box the canvas used to be clamped to.
  * Everything the player aims with (block width, hook, tower line, HUD) is keyed
  * to the column so the game plays identically at every screen shape; only the
- * scenery — backdrop, clouds, balloon, birds — uses the full canvas, which is
+ * scenery — backdrop, clouds, customer, birds — uses the full canvas, which is
  * what makes a laptop feel like a wider view of the same world rather than a
  * phone screen with wallpaper either side.
  *
@@ -22,27 +22,23 @@ export const gameScore = 'GAME_SCORE'
 // How happy the customer is with the cake, 0-100. Rises when a layer lands
 // mostly intact, falls when one gets clipped or missed entirely. Also swings
 // the score in both directions — see addSatisfaction in utils.js.
+//
+// It has no gauge any more: the customer says it themselves, on video. What the
+// number still does is carry the mood between landings and pay the tip.
 export const satisfaction = 'SATISFACTION'
-// What the bar is currently showing. Chases `satisfaction` a little behind it
-// so a big swing slides instead of snapping.
-export const satisfactionShown = 'SATISFACTION_SHOWN'
-// Meter points per second the bar slides at while catching up.
-export const satisfactionSlideRate = 70
 export const satisfactionStart = 60
 // A landing that keeps at least this much of the layer pleases the customer;
-// below it, they mind the waste.
+// below it, they mind the waste. Also the bar for the HAPPY reaction clip: a
+// landing has to be perfect or near-perfect to be worth a face.
 export const satisfactionGoodKeep = 0.8
+// ...and the bar for the ANGRY one, from the other end: keep a third or less of
+// the layer and the customer minds out loud. Between the two they say nothing
+// and keep watching, which is most drops — see moodForKeep in utils.js.
+export const moodAngryKeep = 0.65
 // Score is nudged by (satisfaction change) x this. Small on purpose: a full
 // swing from delighted to furious is worth about two clean landings, so the
 // meter colours the score rather than dominating it.
 export const satisfactionScoreRate = 0.6
-// Where the reaction markers sit along the channel, and the satisfaction each
-// one speaks for. The lit face is the highest whose `at` you have reached.
-export const satisfactionLevels = [
-  { pos: 0.16, at: 0 },
-  { pos: 0.50, at: 40 },
-  { pos: 0.84, at: 75 }
-]
 
 export const hookDown = 'HOOK_DOWN'
 export const hookUp = 'HOOK_UP'
@@ -94,9 +90,18 @@ export const hookTopFactor = -3.4
 export const hookSize = 0.13
 export const flightCount = 'FLIGHT_COUNT'
 export const flightLayer = 'FLIGHT_LAYER'
-// The balloon has its own layer, painted after the tower, so it flies IN FRONT
-// of the blocks. The birds on flightLayer stay behind them.
-export const balloonLayer = 'BALLOON_LAYER'
+// The customer has their own layer, painted after the tower, so they hover IN
+// FRONT of the blocks. The birds on flightLayer stay behind them.
+export const customerLayer = 'CUSTOMER_LAYER'
+/* Which reaction clip the customer should be playing, and the game time the ask
+ * came in — a reaction holds for a moment and then lapses back to watching, so
+ * the request needs its timestamp as much as its name. See src/customer.js. */
+export const customerMood = 'CUSTOMER_MOOD'
+export const customerMoodAt = 'CUSTOMER_MOOD_AT'
+/* The engine hands the frame time to actions but keeps no clock a non-action can
+ * read, and the landing path is a plain function call — so the customer's action
+ * parks the time here for setCustomerMood to stamp a request with. */
+export const gameTime = 'GAME_TIME'
 // Set when the third life is lost. The whole scene freezes on this frame: no
 // scrolling, no new blocks, no drifting sprites — see freezeGame().
 export const gameOver = 'GAME_OVER'

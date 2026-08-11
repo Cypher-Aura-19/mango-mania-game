@@ -10,6 +10,8 @@ import {
   addScore,
   addSatisfaction,
   getSatisfactionDelta,
+  moodForKeep,
+  setCustomerMood,
   isGameOver,
   playSfx,
   pl,
@@ -344,6 +346,10 @@ const applyLand = (engine, block, line, opts) => {
   // The customer's verdict on the layer. Applied after addScore so the tip or
   // the docking lands on top of the landing's own points.
   addSatisfaction(engine, getSatisfactionDelta(keepRatio))
+  /* And the face, which is a SEPARATE question from the meter: the meter moves
+   * on every landing, the customer only speaks for a clean one or a badly
+   * clipped one. Everything in between leaves them watching. */
+  setCustomerMood(engine, moodForKeep(keepRatio))
   // Mango cream squishes out along the seam where the cake layer slammed down.
   // A perfect landing squeezes out a bigger, wider splash.
   spawnCream(engine, {
@@ -935,7 +941,14 @@ const creamPainter = (instance, engine) => {
 const spawnCream = (engine, {
   x, y, count, spread, power, sizeBase, dir, drip, host, hostSide
 }) => {
-  for (let n = 0; n < count; n += 1) {
+  const gameOption = engine.getVariable(constant.gameUserOption) || {}
+  // Large landing bursts can add 20+ independently updated/drawn instances in
+  // one frame. Preserve single drips, but halve decorative bursts on the mobile
+  // performance profile so input and physics remain the frame priority.
+  const particleCount = gameOption.performanceMode && count > 1
+    ? Math.max(1, Math.ceil(count * 0.5))
+    : count
+  for (let n = 0; n < particleCount; n += 1) {
     const p = new Instance({
       name: `cream_${creamSeq++}`,
       action: creamAction,
@@ -1016,4 +1029,3 @@ const spawnFragment = (engine, block, { left, width, height, fallDir, cutSide, c
   frag.cutJag = cutJag
   engine.addInstance(frag)
 }
-

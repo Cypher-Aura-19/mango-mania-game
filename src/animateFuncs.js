@@ -5,7 +5,6 @@ import {
   getMoveDownValue,
   drawBoardString,
   getAngleBase,
-  getReactionLevel,
   isGameOver,
   freezeGame,
   pw
@@ -24,13 +23,6 @@ const panelRect = {
 const socketRect = {
   first: 0.22, pitch: 0.28, cy: 0.48, dia: 0.217
 }
-// Where the gauge channel sits inside meter-track.webp, as fractions of that
-// image. meter-fill.webp is the same size with its column in the same place, which
-// is what lets the fill be drawn by cropping. Printed by
-// tools/make-satisfaction-meter.py.
-const channelRect = {
-  x: 0.224, y: 0.1038, w: 0.55, h: 0.8471
-}
 /* HUD geometry. Every SIZE below is a fraction of the stacking column (pw), so a
  * plaque is the same size on a laptop as on a phone; only the PLACEMENT keys to
  * the full canvas, which pushes the plaques out to the real screen corners
@@ -39,9 +31,6 @@ const hudTop = 0.025          // fraction of the column width
 const hudMargin = 0.03
 const hudHeight = 0.22
 const livesWidth = 0.30
-const meterWidth = 0.13       // fraction of the column; height follows the art
-const meterTop = 0.36         // fraction of the column, clear of the FLOOR plaque
-const badgeSize = 0.76        // fraction of the meter's drawn width
 const numberColor = '#4A3012'
 
 // Gutter between the HUD and the edge of the SCREEN. A column-sized margin is
@@ -104,82 +93,6 @@ const drawLives = (engine, right, bottom, width, failedCount) => {
   }
 }
 
-// Customer-satisfaction gauge on the left edge, below the FLOOR plaque. The
-// frame and the empty channel are baked into the track image; only the juice
-// column, its surface glint and the reaction faces are drawn live.
-const drawMeter = (engine) => {
-  const track = engine.getImg('meterTrack')
-  const fill = engine.getImg('meterFill')
-  if (!track || !track.width || !fill || !fill.width) return
-  const { ctx } = engine
-  const colW = pw(engine)
-  const width = colW * meterWidth
-  const height = (track.height * width) / track.width
-  const x = hudGutter(engine)
-  const y = colW * meterTop
-  ctx.drawImage(track, x, y, width, height)
-
-  // What the gauge shows lags the real value, so a swing reads as the column
-  // settling rather than teleporting.
-  const value = engine.getVariable(constant.satisfaction, constant.satisfactionStart)
-  let shown = engine.getVariable(constant.satisfactionShown, value)
-  if (shown !== value) {
-    const step = engine.pixelsPerFrame(constant.satisfactionSlideRate)
-    shown = shown < value
-      ? Math.min(value, shown + step)
-      : Math.max(value, shown - step)
-    engine.setVariable(constant.satisfactionShown, shown)
-  }
-
-  const chX = x + (width * channelRect.x)
-  const chW = width * channelRect.w
-  const chY = y + (height * channelRect.y)
-  const chH = height * channelRect.h
-  const juice = Math.max(0, Math.min(1, shown / 100))
-  if (juice > 0) {
-    // The fill PNG is the same size as the track with its column in the same
-    // place, so the bottom `juice` of the source maps straight onto the bottom
-    // `juice` of the channel — no per-axis arithmetic, and the column keeps its
-    // rounded foot.
-    const srcH = fill.height * channelRect.h * juice
-    const srcTop = (fill.height * (channelRect.y + channelRect.h)) - srcH
-    const dstH = chH * juice
-    ctx.drawImage(fill, 0, srcTop, fill.width, srcH,
-      x, chY + chH - dstH, width, dstH)
-    // A bright edge along the surface. Skipped when the level sits inside the
-    // channel's rounded cap, where a flat line would poke through the wall.
-    if (juice > 0.08 && juice < 0.92) {
-      ctx.fillStyle = 'rgba(255, 238, 186, 0.8)'
-      ctx.fillRect(chX + (chW * 0.10), chY + chH - dstH, chW * 0.80,
-        Math.max(1, chW * 0.045))
-    }
-  }
-  drawReactions(engine, x, width, chY, chH, value)
-}
-
-// The customer faces standing in for the reference art's stars. Exactly one is
-// lit — the highest level the satisfaction has reached — so the lit face IS the
-// current mood and its height on the gauge shows where that mood sits.
-const drawReactions = (engine, x, width, chY, chH, value) => {
-  const { ctx } = engine
-  const size = width * badgeSize
-  const levels = constant.satisfactionLevels
-  // Same rule the reaction sounds fire on, so the lit face and the voice can
-  // never disagree. See getReactionLevel in utils.js.
-  const lit = getReactionLevel(value)
-  for (let i = 0; i < levels.length; i += 1) {
-    const active = i === lit
-    const img = engine.getImg(`reaction${i + 1}${active ? '' : 'Off'}`)
-    if (img && img.width) {
-      const cy = chY + (chH * (1 - levels[i].pos))
-      ctx.save()
-      if (!active) ctx.globalAlpha = 0.82
-      ctx.drawImage(img, x + ((width - size) / 2), cy - (size / 2), size, size)
-      ctx.restore()
-    }
-  }
-}
-
 /* Flypasts, keyed by the floor that sets them off. `id` is just a unique slot
  * number — it names the instance and stops the same pass being added twice while
  * the floor holds — so the artwork is named separately and can repeat.
@@ -235,7 +148,9 @@ export const endAnimate = (engine) => {
   // it.
   drawLives(engine, right, engine.height - gutter,
     colW * livesWidth, failedCount)
-  drawMeter(engine)
+  /* The satisfaction gauge used to be drawn here, on the left below the FLOOR
+   * plaque. The customer says it on video now — see src/customer.js — so the
+   * number has no HUD of its own and the left edge is clear. */
   // Last thing in the frame: if the run just ended, stop the loop here, with
   // this fully-painted frame left on screen.
   freezeGame(engine)

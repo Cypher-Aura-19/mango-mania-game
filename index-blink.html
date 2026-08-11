@@ -585,9 +585,11 @@
   let gameProgress = 0;
   let modelProgress = 0;
   let pageProgress = 0;
+  let vidProgress = 0;
   let gameDone = false;
   let modelDone = false;
   let pageDone = false;
+  let vidDone = false;
   let cameraOk = false;
   let cameraDenied = false;
   let camSettled = false;   // camera has either started or been refused
@@ -659,7 +661,6 @@
     [
       'drop-perfect', 'drop', 'game-over', 'rotate', 'click',
       'swing', 'fall', 'land', 'clip', 'drip',
-      'react-happy', 'react-ok', 'react-angry',
       'flight-plane', 'flight-rocket', 'flight-birds', 'flight-comet', 'celebrate'
     ].forEach((name) => {
       try {
@@ -714,13 +715,16 @@
      park a truthful bar at 75% for as long as the player stares at the
      browser's prompt.
      ============================================================ */
-  const LOAD_WEIGHT = { game: 0.45, model: 0.3, page: 0.15, cam: 0.1 };
+  const LOAD_WEIGHT = {
+    game: 0.4, model: 0.27, page: 0.13, vid: 0.1, cam: 0.1
+  };
 
   function renderProgress() {
     const camPart = cameraOk || cameraDenied ? 1 : 0;
     const combined = (gameProgress * LOAD_WEIGHT.game) +
       (modelProgress * LOAD_WEIGHT.model) +
       (pageProgress * LOAD_WEIGHT.page) +
+      (vidProgress * LOAD_WEIGHT.vid) +
       (camPart * LOAD_WEIGHT.cam);
     const pct = allReady ? 100 : Math.min(99, Math.round(combined * 100));
     loadPct.textContent = pct + '%';
@@ -732,6 +736,7 @@
     else if (!gameDone) detail = 'Loading game assets…';
     else if (!modelDone) detail = 'Loading blink engine…';
     else if (!pageDone) detail = 'Loading artwork…';
+    else if (!vidDone) detail = 'Loading the customer…';
     else if (!cameraOk && !cameraDenied) detail = 'Waiting for camera permission…';
     else if (cameraDenied) {
       detail = 'Ready (tap/click to play)';
@@ -813,7 +818,7 @@
 
   function checkAllReady() {
     if (allReady) return;
-    if (gameDone && modelDone && pageDone && camSettled) {
+    if (gameDone && modelDone && pageDone && vidDone && camSettled) {
       allReady = true;
       renderProgress();
       finishLoading();
@@ -1164,6 +1169,14 @@
     setGameFailed: (f) => {
       if (f >= 3) overShowOver();
     },
+    /* The customer's clips report in one at a time. Passed in the option rather
+     * than assigned to the engine afterwards because the videos start loading
+     * inside TowerGame() — by the time it has returned, the first clip may
+     * already have arrived and a hook attached then would miss its tick. */
+    onCustomerProgress: (done, total) => {
+      vidProgress = done / total;
+      renderProgress();
+    },
   };
 
   // ---- game over summary -------------------------------------------------
@@ -1412,6 +1425,25 @@
 
   function initGame() {
     game = TowerGame(option);
+    /* This page is a module, so `game` is module-scoped and nothing outside can
+     * reach it -- unlike the tap page, whose classic script puts it on window for
+     * free. Exposed deliberately so the smoke tests can read the engine's own
+     * state on both editions rather than only one. */
+    window.game = game;
+    /* The customer's clips are <video>, so game.load() below knows nothing about
+     * them and they need their own arm of the gate. The promise never rejects
+     * and times out on its own, so this cannot strand the PLAY button; guarded
+     * anyway, because an older bundle in a cache would not have it at all. */
+    if (game.customerReady) {
+      game.customerReady.then(() => {
+        vidProgress = 1;
+        vidDone = true;
+        renderProgress();
+        checkAllReady();
+      });
+    } else {
+      vidDone = true;
+    }
     game.load(() => {
       game.init();
       startBgm();

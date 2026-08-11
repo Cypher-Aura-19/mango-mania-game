@@ -4,7 +4,7 @@ import { background } from './background'
 import { lineAction, linePainter } from './line'
 import { hookAction, hookPainter } from './hook'
 import { tutorialAction, tutorialPainter } from './tutorial'
-import { addBalloon } from './balloon'
+import { addCustomer } from './customer'
 import * as constant from './constant'
 import { startAnimate, endAnimate } from './animateFuncs'
 
@@ -15,9 +15,30 @@ window.TowerGame = (option = {}) => {
     canvasId,
     soundOn
   } = option
+  /* The engine's "high resolution" mode is a fixed 2x backing store. That is
+   * four times as many pixels every frame, even on phones which are already
+   * decoding video (and, in blink mode, running a camera model). Keep the crisp
+   * 2x canvas on capable pointer devices and use a 1x backing store on touch or
+   * memory/CPU constrained devices. Callers can still override either choice. */
+  const nav = window.navigator || {}
+  const coarsePointer = window.matchMedia
+    ? window.matchMedia('(pointer: coarse)').matches
+    : false
+  const constrained = option.performanceMode === undefined
+    ? (coarsePointer || nav.maxTouchPoints > 0
+      || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 4)
+      || (nav.deviceMemory && nav.deviceMemory <= 4))
+    : !!option.performanceMode
+  const highResolution = option.highResolution === undefined
+    ? !constrained
+    : !!option.highResolution
+  // Store the resolved profile in the same options object all game systems use.
+  option.performanceMode = constrained
+  option.highResolution = highResolution
+
   const game = new Engine({
     canvasId,
-    highResolution: true,
+    highResolution,
     width,
     height,
     soundOn
@@ -43,7 +64,6 @@ window.TowerGame = (option = {}) => {
   game.addImg('blockRope', pathGenerator('block-rope.webp'))
   game.addImg('block', pathGenerator('block.webp'))
   game.addImg('block-perfect', pathGenerator('block-perfect.webp'))
-  game.addImg('balloon', pathGenerator('balloon.webp'))
   /* Sky decor. c1..c3 were the plain white clouds and are no longer used, so
    * only the mango-space props are registered. They are painted straight into
    * the backdrop tiles now rather than drifting as sprites — see the decor
@@ -53,20 +73,20 @@ window.TowerGame = (option = {}) => {
   }
   game.addLayer(constant.flightLayer)
   /* Only the flypast art the schedule actually asks for. f2/f3 were a pair of
-   * red-and-cream hot-air balloons from the original artwork — off-theme next to
-   * the mango balloon that already drifts past, and dropped. f5 is a byte-for-byte
-   * copy of the f4 plane, so the second plane pass reuses f4 rather than paying
-   * for the same 1.4MB download twice. Both files are still in assets/. */
+   * red-and-cream hot-air balloons from the original artwork and are dropped.
+   * f5 is a byte-for-byte copy of the f4 plane, so the second plane pass reuses
+   * f4 rather than paying for the same 1.4MB download twice. Both files are
+   * still in assets/. */
   const flightImgs = ['f1', 'f4', 'f6', 'f7']
   flightImgs.forEach((name) => {
     game.addImg(name, pathGenerator(`${name}.webp`))
   })
   game.swapLayer(0, 1)
-  /* Layers now paint in the order [flight, default, balloon]: birds behind the
-   * tower, blocks next, balloon last. Added AFTER the swap on purpose — swap
-   * indices 0 and 1 are the only two layers that exist at that point, and
-   * appending afterwards is what puts the balloon on top. */
-  game.addLayer(constant.balloonLayer)
+  /* Layers now paint in the order [flight, default, customer]: birds behind the
+   * tower, blocks next, the customer last. Added AFTER the swap on purpose —
+   * swap indices 0 and 1 are the only two layers that exist at that point, and
+   * appending afterwards is what puts the customer on top. */
+  game.addLayer(constant.customerLayer)
   game.addImg('tutorial', pathGenerator('tutorial.webp'))
   game.addImg('tutorial-arrow', pathGenerator('tutorial-arrow.webp'))
   game.addImg('mango', pathGenerator('mango.webp'))
@@ -75,15 +95,12 @@ window.TowerGame = (option = {}) => {
   game.addImg('hudScore', pathGenerator('hud-score.webp'))
   game.addImg('hudFloor', pathGenerator('hud-floor.webp'))
   game.addImg('hudLives', pathGenerator('hud-lives.webp'))
-  // Satisfaction meter: an empty wooden gauge, the juice column that fills it,
-  // and one reaction face per level in a lit and a greyed-out version.
-  // Regenerate with tools/make-satisfaction-meter.py.
-  game.addImg('meterTrack', pathGenerator('meter-track.webp'))
-  game.addImg('meterFill', pathGenerator('meter-fill.webp'))
-  for (let i = 1; i <= 3; i += 1) {
-    game.addImg(`reaction${i}`, pathGenerator(`reaction-${i}.webp`))
-    game.addImg(`reaction${i}Off`, pathGenerator(`reaction-${i}-off.webp`))
-  }
+  /* The satisfaction gauge's art — the wooden track, the juice column and the
+   * six reaction faces — is gone with the gauge itself. The customer reacts on
+   * video now (src/customer.js), so nothing here loads for the mechanic; the
+   * three clips are <video> elements and never touch the engine's image loader.
+   * The files are still in assets/, and tools/make-satisfaction-meter.py still
+   * regenerates them, in case the gauge is ever wanted back. */
   // Mango cream sprinkle variants: blob, teardrop, capsule sprinkle, dot.
   for (let i = 1; i <= 4; i += 1) {
     game.addImg(`cream${i}`, pathGenerator(`cream-${i}.webp`))
@@ -117,11 +134,6 @@ window.TowerGame = (option = {}) => {
   game.addAudio('swing', pathGenerator('swing.mp3'))
   game.addAudio('fall', pathGenerator('fall.mp3'))
   game.addAudio('land', pathGenerator('land.mp3'))
-  /* The customer's verdict — one wordless reaction per face on the satisfaction
-   * gauge, played when the lit face changes. See tools/make-customer-sfx.js. */
-  game.addAudio('react-happy', pathGenerator('react-happy.mp3'))
-  game.addAudio('react-ok', pathGenerator('react-ok.mp3'))
-  game.addAudio('react-angry', pathGenerator('react-angry.mp3'))
   /* The engine has no mixer, so levels are set on the elements themselves.
    * These sit on top of a bed of music and the drop sounds, and element volume
    * only ever scales DOWN — so the clips themselves are normalised to a common
@@ -149,13 +161,7 @@ window.TowerGame = (option = {}) => {
     fall: 0.5,
     // The thud sits UNDER drop/drop-perfect rather than beside them; at parity
     // the two attacks fight and the landing reads as a rattle.
-    land: 0.6,
-    /* The reactions carry the mechanic the meter exists for, so they are the
-     * loudest thing here — but they only fire when the lit face changes, which
-     * is a handful of times a run. */
-    'react-happy': 0.85,
-    'react-ok': 0.7,
-    'react-angry': 0.85
+    land: 0.6
   }
   Object.keys(levels).forEach((name) => {
     const audio = game.getAudio(name)
@@ -202,8 +208,11 @@ window.TowerGame = (option = {}) => {
     painter: hookPainter
   })
   game.addInstance(hook)
-  // The mango hot-air balloon wanders in and watches the tower being built.
-  addBalloon(game)
+  /* The customer hovers beside the tower on video, watching it go up. The three
+   * clips are <video> elements, so the engine's image/audio loader knows nothing
+   * about them — the promise, and the per-clip ticks, are handed to the page
+   * instead, which folds both into the same loading bar. */
+  game.customerReady = addCustomer(game, option.onCustomerProgress)
 
   game.startAnimate = startAnimate
   game.endAnimate = endAnimate

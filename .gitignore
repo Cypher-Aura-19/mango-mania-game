@@ -48,3 +48,7 @@ __pycache__/
 
 .vercel
 .env*
+
+# Camera masters for the reaction clips. ~7 MB that never ship: assets/*.webm
+# and assets/*.mp4 are built from these by tools/encode-clips.js.
+.video-src/

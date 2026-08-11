@@ -194,23 +194,42 @@ export const getSatisfactionDelta = (keepRatio) => {
   return -(2 + (18 * ((good - keepRatio) / good)))
 }
 
-/* Which reaction face a satisfaction value lights: the highest level whose `at`
- * it has reached. The gauge paints from this and the reaction sounds fire from
- * it, and they have to agree — a grunt with a smiling face still lit is worse
- * than no grunt at all — so both read this one function.
- */
-export const getReactionLevel = (value) => {
-  const levels = constant.satisfactionLevels
-  let lit = 0
-  for (let i = 0; i < levels.length; i += 1) {
-    if (value >= levels[i].at) lit = i
-  }
-  return lit
+/* Which reaction clip a landing calls for, read off HOW WELL THE LAYER LANDED.
+ *
+ * This used to be derived from the satisfaction delta, and that was the wrong
+ * quantity: the delta is a curve with a narrow neutral band, so nearly every
+ * landing cleared one threshold or the other and the customer flipped between
+ * happy and angry on almost every floor. Watching — the resting state, the thing
+ * that should be on screen MOST of the time — was hardly ever seen.
+ *
+ * So the verdict comes straight from the geometry now, with a wide middle:
+ *
+ *   happy    the layer landed clean — `satisfactionGoodKeep` (80%) or more of it
+ *            survived. Perfect and near-perfect drops, nothing else.
+ *   angry    a third or more of the layer was sheared off
+ *            (`moodAngryKeep`). A total miss is angry too, but that path does
+ *            not come through here — see addFailedCount.
+ *   null     everything in between, which is most drops: the customer keeps
+ *            watching and says nothing.
+ *
+ * This and setCustomerMood live here rather than in customer.js because
+ * customer.js imports this file for the column helpers; putting them there
+ * would close a require cycle to save nothing. */
+export const moodForKeep = (keepRatio) => {
+  if (keepRatio >= constant.satisfactionGoodKeep) return 'happy'
+  if (keepRatio <= constant.moodAngryKeep) return 'angry'
+  return null
 }
 
-// Indexed by reaction level, so this array is in the same order as the faces on
-// the gauge: bottom (angry) to top (delighted).
-const reactionSounds = ['react-angry', 'react-ok', 'react-happy']
+/* Ask the customer for a reaction. Goes through engine variables rather than a
+ * handle on the instance, so a landing that somehow beats the instance into
+ * existence is a no-op instead of a crash — and so the request survives being
+ * made from anywhere in the landing path. */
+export const setCustomerMood = (engine, mood) => {
+  if (!mood) return
+  engine.setVariable(constant.customerMood, mood)
+  engine.setVariable(constant.customerMoodAt, engine.getVariable(constant.gameTime, 0))
+}
 
 // Move the meter and pay out the swing. The customer tipping better for a tidy
 // cake, and docking you for a mangled one, is the whole point of the mechanic.
@@ -219,19 +238,10 @@ export const addSatisfaction = (engine, delta) => {
   const before = engine.getVariable(constant.satisfaction, constant.satisfactionStart)
   const after = Math.max(0, Math.min(100, before + delta))
   engine.setVariable(constant.satisfaction, after)
-  /* Voice the customer only when the LIT FACE CHANGES, not on every landing.
-   * Every drop moves the meter, so a reaction per drop would be a running
-   * commentary; a reaction per mood change is a handful of times a run, and it
-   * means the sound always tells the player something the number alone did not.
-   *
-   * The face is read off `after` rather than off satisfactionShown, so the voice
-   * arrives with the event that caused it — the column is still sliding up to
-   * meet it, which is the right way round. */
-  const litBefore = getReactionLevel(before)
-  const litAfter = getReactionLevel(after)
-  if (litAfter !== litBefore) {
-    playSfx(engine, reactionSounds[litAfter])
-  }
+  /* No reaction is asked for here any more. The meter moves on EVERY landing,
+   * by a curve with a narrow neutral band, so driving the clips from it meant a
+   * reaction on nearly every floor. The verdict is the layer's geometry, not the
+   * meter's swing — callers ask for it themselves with moodForKeep. */
   // Pay for the movement that actually happened, not the movement asked for.
   // Once the meter is pinned at 100 there is no more goodwill left to earn, so
   // a run of flawless drops stops printing free points.
@@ -287,6 +297,8 @@ export const addFailedCount = (engine) => {
   engine.setVariable(constant.perfectCount, 0)
   // A layer on the floor is the worst thing the customer can watch happen.
   addSatisfaction(engine, -25)
+  // A layer that never landed at all is the loudest angry there is.
+  setCustomerMood(engine, 'angry')
   if (setGameFailed) setGameFailed(failed)
   if (failed >= 3) {
     engine.pauseAudio('bgm')

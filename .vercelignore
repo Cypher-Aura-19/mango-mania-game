@@ -22,3 +22,7 @@ assets/**/*.png
 
 # Notes, not runtime.
 *.md
+
+# The camera masters the clips are encoded from. .video-src/*.orig.mp4
+# never ship; assets/*.webm and assets/*.mp4 are the deployed copies.
+.video-src/
