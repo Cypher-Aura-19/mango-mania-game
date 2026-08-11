@@ -663,9 +663,11 @@ const customerAction = (instance, engine, time) => {
     // silence its voice on the same frame so a cut-short reaction does not go on
     // talking underneath the one that replaced it.
     stopVoice(engine, i)
-    if (from && i.shown !== 'watching') {
+    if (from) {
+      // Only the visible clip decodes. Leaving the watching loop running behind
+      // every reaction made phones decode two videos while also keying one.
       from.el.pause()
-      from.el.currentTime = 0
+      if (i.shown !== 'watching') from.el.currentTime = 0
     }
     i.shown = want
     const next = i.videos[want]
@@ -759,5 +761,9 @@ export const addCustomer = (game, onProgress) => {
   })
   customer.videos = videos
   game.addInstance(customer, constant.customerLayer)
-  return whenVideosReady(videos, onProgress)
+  return whenVideosReady(videos, onProgress).then(() => {
+    // Its first frame is decoded for instant start; do not spend battery
+    // decoding the watching loop underneath the menu screens.
+    videos.watching.el.pause()
+  })
 }

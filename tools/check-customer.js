@@ -154,6 +154,14 @@ async function main() {
    * game over and the action stops reading the variable at all. */
   const forced = {}
   if (!await over()) {
+    // Retire any reaction produced by the scripted drops so the forced happy
+    // request starts from watching rather than being correctly rejected by an
+    // equal/higher-priority reaction that is still playing through.
+    await page.evaluate((layer) => {
+      const i = window.game.getInstance('customer', layer)
+      if (i) i.until = 0
+    }, LAYER)
+    await page.waitForTimeout(350)
     /* eslint-disable no-restricted-syntax */
     for (const mood of ['happy', 'angry']) {
       await page.evaluate((m) => {

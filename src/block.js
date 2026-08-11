@@ -63,11 +63,31 @@ const swingCakeBox = instance => ({
   h: instance.height
 })
 
-// How big the cake looks while it dangles, relative to the size it lands at.
-// Below 1 it reads as further away up on the rope. Shrunk about the box CENTRE
-// so releasing it grows it back symmetrically — an edge anchor would make the
-// block visibly jump sideways or downward on the first frame of the drop.
-const SWING_SCALE = 0.88
+// Keep the hanging cake at its physical size. Painting it smaller and switching
+// to full size at release caused a visible one-frame vertical grow/pop.
+const SWING_SCALE = 1
+
+/* The source cake art is print-sized (block.webp alone is 4678x1705). Asking a
+ * phone GPU to resample that texture for every visible floor, every frame,
+ * burns memory bandwidth for detail that cannot reach the screen. Once loading
+ * is complete, replace the three engine images with display-sized canvases.
+ * All source-rect clipping still works because it is ratio-based. */
+export const prepareBlockTextures = (engine) => {
+  const target = Math.max(2, Math.ceil(engine.getVariable(constant.blockWidth) * 1.12))
+  ;['block', 'block-perfect', 'blockRope'].forEach((name) => {
+    const source = engine.getImg(name)
+    if (!source || !source.width || source._displaySized) return
+    const canvas = document.createElement('canvas')
+    canvas.width = target
+    canvas.height = Math.max(2, Math.ceil(source.height * target / source.width))
+    const ctx = canvas.getContext('2d')
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
+    canvas._displaySized = true
+    engine.assetsObj.image[name] = canvas
+  })
+}
 
 /* Where the sling's gold ring is on screen — the point the hook's claw has to
  * close on.
@@ -480,7 +500,13 @@ export const blockAction = (instance, engine, time) => {
       i.x = cake.x
       i.y = cake.y
       i.rotate = 0
-      i.ay = engine.pixelsPerFrame(0.0003 * engine.height) // acceleration of gravity
+      /* Real-time gravity, in pixels/second squared. The old value divided by
+       * the latest FPS sample and was then multiplied by milliseconds twice.
+       * One slow phone frame could therefore multiply gravity many times and
+       * throw the cake through the target. This is stable at every frame rate. */
+      i.vy = 0
+      i.ay = engine.height * 5
+      i.dropBeganAt = time
       i.startDropTime = time
       i.status = constant.drop
       /* The air on the way down. Voiced here, on the one frame the release
@@ -494,11 +520,16 @@ export const blockAction = (instance, engine, time) => {
       break
     }
     case constant.drop:
-      const deltaTime = time - i.startDropTime
+      // Cap only a true suspension/background jump. Normal 10-120Hz devices
+      // use their full elapsed time, so the fall takes the same real duration.
+      const deltaTime = Math.max(0, Math.min(0.5, (time - i.startDropTime) / 1000))
       i.startDropTime = time
-      i.vy += i.ay * deltaTime
       i.y += (i.vy * deltaTime) + (0.5 * i.ay * (deltaTime ** 2))
+      i.vy += i.ay * deltaTime
       const collision = checkCollision(instance, line)
+      // Horizontal overlap is not a landing. Until the cake's bottom actually
+      // reaches the tower, keep falling and do not enter scoring/clipping logic.
+      if (collision === 0) break
       const blockY = line.y - instance.height
       // Capture the ORIGINAL block left edge now — applyLand() mutates
       // instance.x, so it must not be read after the stack happens.

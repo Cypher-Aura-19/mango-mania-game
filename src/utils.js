@@ -128,30 +128,46 @@ export const getLandBlockVelocity = (engine, time) => {
   const successCount = engine.getVariable(constant.successCount)
   const gameScore = engine.getVariable(constant.gameScore)
   const { landBlockSpeed, swingSpeedScale } = engine.getVariable(constant.gameUserOption)
+  let velocity
   if (landBlockSpeed) {
-    return landBlockSpeed(successCount, gameScore)
+    velocity = landBlockSpeed(successCount, gameScore)
   }
   const { width } = engine
-  let hard
-  switch (true) {
-    case successCount < 5:
-      hard = 0
-      break
-    case successCount < 13:
-      hard = 0.001
-      break
-    case successCount < 23:
-      hard = 0.002
-      break
-    default:
-      hard = 0.003
-      break
+  if (velocity === undefined) {
+    let hard
+    switch (true) {
+      case successCount < 5:
+        hard = 0
+        break
+      case successCount < 13:
+        hard = 0.001
+        break
+      case successCount < 23:
+        hard = 0.002
+        break
+      default:
+        hard = 0.003
+        break
+    }
+    // Optional per-game slowdown (blink edition) to reduce the left-right drift.
+    if (swingSpeedScale) {
+      hard *= swingSpeedScale
+    }
+    velocity = Math.cos(time / 200) * hard * width
   }
-  // Optional per-game slowdown (blink edition) to reduce the left-right drift.
-  if (swingSpeedScale) {
-    hard *= swingSpeedScale
+
+  /* This value used to be added once per rendered frame. At 60fps that looked
+   * right; at 15fps a phone accumulated only a quarter of the motion, so the
+   * tower and collision target ended up in a different place. Scale the legacy
+   * 60fps delta by elapsed time and cache it because the line and every landed
+   * block ask for the same delta during one engine frame. */
+  if (!engine._landSwayClock) engine._landSwayClock = { time, scale: 1 }
+  if (engine._landSwayClock.time !== time) {
+    const dt = Math.max(0, Math.min(0.25, (time - engine._landSwayClock.time) / 1000))
+    engine._landSwayClock.time = time
+    engine._landSwayClock.scale = dt * 60
   }
-  return Math.cos(time / 200) * hard * width
+  return velocity * engine._landSwayClock.scale
 }
 
 export const getHookStatus = (engine) => {
@@ -381,4 +397,3 @@ export const drawBoardString = (engine, option) => {
   ctx.fillText(text, x, y)
   ctx.restore()
 }
-

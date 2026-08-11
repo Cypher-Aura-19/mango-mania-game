@@ -541,9 +541,9 @@
   const MAX_BLINK_MS = 500;       // ignore deliberate long closes
   // Minimum gap between accepted blinks (prevents double-trigger)
   const BLINK_COOLDOWN_MS = 300;
-  // Detection runs at 30fps for instant response + reliable capture: samples every
-  // 33ms so fast blinks are caught, and worst-case latency is ~50ms (instant feel).
-  const DETECT_INTERVAL_MS = 1000 / 30;
+  // 20Hz comfortably catches a human blink while avoiding needless camera
+  // bitmap uploads and GPU inference that compete with canvas rendering.
+  const DETECT_INTERVAL_MS = 1000 / 20;
 
   /* ============================================================
      DOM REFS
@@ -622,6 +622,11 @@
   // user gesture, so we unlock all audio the moment the stream goes live (and
   // again on any click/tap/key) instead of waiting for a click that never comes.
   function unlockAudio() {
+    if (game && game.unlockAudio) {
+      game.unlockAudio();
+      audioUnlocked = true;
+      return;
+    }
     if (audioUnlocked || !game) {
       if (game) audioUnlocked = true;
       return;

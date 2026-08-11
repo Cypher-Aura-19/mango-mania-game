@@ -7,6 +7,7 @@ import { tutorialAction, tutorialPainter } from './tutorial'
 import { addCustomer } from './customer'
 import * as constant from './constant'
 import { startAnimate, endAnimate } from './animateFuncs'
+import { prepareBlockTextures } from './block'
 
 window.TowerGame = (option = {}) => {
   const {
@@ -214,9 +215,60 @@ window.TowerGame = (option = {}) => {
    * instead, which folds both into the same loading bar. */
   game.customerReady = addCustomer(game, option.onCustomerProgress)
 
+  /* Unlock every HTML media element during a real gesture. Mobile Safari can
+   * authorize one element but continue blocking its siblings; the falling and
+   * landing sounds start on a later animation frame, so merely playing a click
+   * sound from the tap is not enough. Warm all effects and customer voices at
+   * zero volume while the gesture is active, then rewind them for real use. */
+  game.unlockAudio = () => {
+    if (!game.soundOn || game._mediaUnlocked) return
+    // An async camera permission callback may no longer have autoplay rights.
+    // Keep the method retryable for the next real tap in that case.
+    if (nav.userActivation && !nav.userActivation.isActive) return
+    game._mediaUnlocked = true
+    const media = Object.keys(game.assetsObj.audio)
+      .map(name => game.assetsObj.audio[name])
+    const customer = game.getInstance('customer', constant.customerLayer)
+    if (customer && customer.videos) {
+      Object.keys(customer.videos).forEach((mood) => {
+        media.push(customer.videos[mood].voice)
+      })
+    }
+    media.forEach((el) => {
+      if (!el || !el.paused) return
+      const level = el.volume
+      const wasMuted = el.muted
+      el.muted = false
+      el.volume = 0
+      const done = () => {
+        el.pause()
+        try { el.currentTime = 0 } catch (e) { /* not seekable yet */ }
+        el.volume = level
+        el.muted = wasMuted
+      }
+      try {
+        const p = el.play()
+        if (p && p.then) p.then(done).catch(done)
+        else done()
+      } catch (e) { done() }
+    })
+  }
+  const unlock = () => game.unlockAudio()
+  // Capture phase puts unlocking ahead of the engine's own touch listener.
+  document.addEventListener('touchstart', unlock, true)
+  document.addEventListener('mousedown', unlock, true)
+  document.addEventListener('keydown', unlock, true)
+
   game.startAnimate = startAnimate
   game.endAnimate = endAnimate
   game.paintUnderInstance = background
+  // Assets are loaded when init is called. Downsize print-resolution cake art
+  // before the first animation frame so gameplay never pays this cost mid-drop.
+  const engineInit = game.init.bind(game)
+  game.init = () => {
+    prepareBlockTextures(game)
+    engineInit()
+  }
   game.addKeyDownListener('enter', () => {
     if (game.debug) game.togglePaused()
   })
