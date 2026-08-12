@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Mango Mania — Score Exports</title>
+  <style>
+    :root { --mango: #ff8a1e; --mango-dark: #e2700a; --ink: #2a1a05; --bg: #fff6e9; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--ink);
+      background: radial-gradient(120% 120% at 50% 0%, #ffd9a1 0%, var(--bg) 55%);
+      padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 460px; background: #fff; border-radius: 18px;
+      box-shadow: 0 12px 40px rgba(226,112,10,.18); padding: 28px 26px 30px;
+    }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    p.sub { margin: 0 0 22px; color: #7a6b55; font-size: 14px; }
+    label { display: block; font-size: 12px; font-weight: 600; margin: 0 0 6px; color: #6b5a3f; }
+    input {
+      width: 100%; padding: 11px 13px; border: 1.5px solid #e7d8c1; border-radius: 10px;
+      font-size: 16px; margin-bottom: 20px; outline: none;
+    }
+    input:focus { border-color: var(--mango); }
+    .btn {
+      display: flex; align-items: center; gap: 12px; width: 100%;
+      padding: 15px 18px; margin-bottom: 12px; border: none; border-radius: 12px;
+      background: var(--mango); color: #fff; font-size: 18px; font-weight: 700;
+      cursor: pointer; text-align: left; text-decoration: none;
+      transition: transform .06s ease, background .15s ease;
+    }
+    .btn:hover { background: var(--mango-dark); }
+    .btn:active { transform: translateY(1px); }
+    .btn .desc { font-weight: 400; font-size: 12px; opacity: .9; display: block; margin-top: 2px; }
+    .btn.secondary { background: #fff; color: var(--mango-dark); border: 1.5px solid var(--mango); }
+    .btn.secondary:hover { background: #fff4e6; }
+    .ico { font-size: 24px; }
+    .note { margin-top: 18px; font-size: 12px; color: #9a8a72; }
+    #status { min-height: 18px; font-size: 14px; margin-top: 10px; }
+    #status.err { color: #c23; }
+    #status.ok { color: #1a8a3a; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>🥭 Score Exports</h1>
+    <p class="sub">Download the leaderboard and full play history as CSV (UTC timestamps, Excel-ready).</p>
+
+    <label for="token">Admin token <span style="font-weight:400;color:#a99">(only if one is set)</span></label>
+    <input id="token" type="password" autocomplete="off" placeholder="leave blank if not configured" />
+
+    <a class="btn" id="lb" href="#">
+      <span class="ico">🏆</span>
+      <span>Top scorers (leaderboard)
+        <span class="desc">Each player's best score, ranked, with the time it was achieved.</span>
+      </span>
+    </a>
+
+    <a class="btn secondary" id="all" href="#">
+      <span class="ico">📜</span>
+      <span>All scores (every try)
+        <span class="desc">One row per play for every player, each with its UTC timestamp.</span>
+      </span>
+    </a>
+
+    <div id="status"></div>
+    <p class="note">Files are named with a UTC timestamp so repeated exports don't overwrite each other.</p>
+  </main>
+
+  <script>
+    // Build the export URL, tacking on ?token= when the field is filled. The
+    // server ignores the token when LEADERBOARD_ADMIN_TOKEN is unset, so a blank
+    // field is fine on an ungated deployment.
+    function url(path) {
+      var t = document.getElementById('token').value.trim();
+      return '/api/export/' + path + (t ? '?token=' + encodeURIComponent(t) : '');
+    }
+
+    var status = document.getElementById('status');
+    function show(msg, kind) { status.textContent = msg; status.className = kind || ''; }
+
+    // Fetch first so a 401 (bad/missing token) becomes a readable message instead
+    // of the browser navigating to a JSON error page. On success, download the blob.
+    function download(path, ev) {
+      ev.preventDefault();
+      show('Preparing download…');
+      fetch(url(path))
+        .then(function (r) {
+          if (r.status === 401) throw new Error('Admin token required or incorrect.');
+          if (!r.ok) throw new Error('Export failed (' + r.status + ').');
+          var name = (r.headers.get('content-disposition') || '').match(/filename="([^"]+)"/);
+          return r.blob().then(function (b) { return { blob: b, name: name ? name[1] : path }; });
+        })
+        .then(function (f) {
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(f.blob);
+          a.download = f.name;
+          document.body.appendChild(a); a.click(); a.remove();
+          URL.revokeObjectURL(a.href);
+          show('Downloaded ' + f.name, 'ok');
+        })
+        .catch(function (e) { show(e.message, 'err'); });
+    }
+
+    document.getElementById('lb').addEventListener('click', function (e) { download('leaderboard.csv', e); });
+    document.getElementById('all').addEventListener('click', function (e) { download('scores.csv', e); });
+  </script>
+</body>
+</html>
