@@ -21,6 +21,11 @@ server.get('/blink', (req, res) => {
   res.sendFile(path.resolve(__dirname, './index-blink.html'));
 })
 
+// Score-export console: buttons for the two CSV exports the API serves.
+server.get('/export', (req, res) => {
+  res.sendFile(path.resolve(__dirname, './export.html'));
+})
+
 server.get('*', (req, res) => {
   res.sendFile(path.resolve(__dirname, './index.html'));
 })

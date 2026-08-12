@@ -11,6 +11,7 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/blink", "destination": "/index-blink.html" },
+    { "source": "/export", "destination": "/export.html" },
     { "source": "/((?!assets/|dist/|api/|favicon).*)", "destination": "/index.html" }
   ],
   "headers": [
