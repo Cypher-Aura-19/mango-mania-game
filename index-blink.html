@@ -592,21 +592,65 @@
   const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
   const VISION_MJS = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
 
-  // EAR thresholds (hysteresis to avoid jitter)
-  const CLOSE_THRESHOLD = 0.23;   // EAR below => eye considered closed (relaxed to catch quick blinks)
-  const OPEN_THRESHOLD  = 0.27;   // EAR above => eye considered open again
-  // Blink timing window (ms)
-  const MIN_BLINK_MS = 30;        // ignore sub-30ms glitches
-  const MAX_BLINK_MS = 500;       // ignore deliberate long closes
+  /* Blink detection, sized for a phone rather than a desktop webcam.
+   *
+   * A fixed EAR threshold assumes desktop geometry: camera at eye level, face
+   * square to it, open eye around .32 falling to .15 when shut. A phone is held
+   * low and tilted, so the eye is foreshortened -- the whole EAR range shifts
+   * down and a complete blink may bottom out at .25, never crossing a .23 line.
+   * That is the "it only works after many tries" symptom exactly.
+   *
+   * So the close line is a FRACTION of this player's own open-eye baseline,
+   * clamped into a sane band so a bad baseline can neither fire constantly nor
+   * never fire. Desktop behaviour is unchanged -- a .32 baseline puts the line
+   * back at ~.24, where it already was. */
+  /* Both numbers are set from measured phone blinks, not from desktop feel.
+   *
+   * A tilted-phone blink is SHALLOW: the eye reads ~.26 open and bottoms near
+   * .21, closing at roughly .75 EAR/second. A .76 ratio puts the line at .20 --
+   * under the dip -- and a 0.9/s velocity gate sits just above the real closing
+   * speed, so both tests missed the same blink by a hair. .84 and 0.55/s clear
+   * a real blink with margin while a steady open eye (velocity ~0, ear at
+   * baseline) still fails both. */
+  const CLOSE_RATIO  = 0.84;      // dip to this share of baseline => closed
+  const REOPEN_RATIO = 0.90;      // back above this share of baseline => open
+  const CLOSE_MIN = 0.15, CLOSE_MAX = 0.28;   // band the close line may sit in
+  const BASE_INIT = 0.32, BASE_MIN = 0.20, BASE_MAX = 0.45;
+  /* Peak-follower decay, per second. Slow enough that a 150ms blink barely
+   * moves it, fast enough that sitting down / re-angling the phone is tracked
+   * within a couple of seconds. */
+  const BASE_DECAY = 0.55;
+  // Samples taken as "this is the open eye" at the start of a run, before any
+  // blink test runs. ~0.4s at phone rates: long enough to be a real reading,
+  // short enough that the player never notices a warm-up.
+  const BASE_SEED_SAMPLES = 10;
+  /* Velocity is per SECOND, not per sample. The old fixed 0.045 delta was
+   * implicitly "per 50ms frame at 20Hz"; on a phone the interval varies with
+   * inference cost, so the same number meant something different every frame.
+   * 0.9/s is that desktop figure expressed in a rate. */
+  const CLOSE_VEL_PER_SEC = 0.55;
+  // A sample this long after the last one is not its neighbour: the sampler was
+  // paused for a drop, or the face was lost. Velocity across it is meaningless.
+  const EAR_GAP_MS = 260;
+  // No real blink lasts this long; past it, assume a bad baseline, not a shut eye.
+  const STUCK_CLOSED_MS = 900;
   // Minimum gap between accepted blinks (prevents double-trigger)
   const BLINK_COOLDOWN_MS = 300;
+
   const APPLE_MOBILE = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     ((navigator.platform === 'MacIntel' || navigator.platform === 'Macintosh') && navigator.maxTouchPoints > 1);
   const PHONE_CAPTURE = APPLE_MOBILE || (navigator.maxTouchPoints > 0 &&
     window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-  // iOS shares a tighter graphics budget between camera inference and canvas.
-  // 12Hz still samples a normal blink while leaving regular main-thread slots.
-  const DETECT_INTERVAL_MS = 1000 / (PHONE_CAPTURE ? 12 : 20);
+  /* Sample as fast as inference allows, rather than on a fixed timer.
+   *
+   * A human blink is 100-150ms. At the old phone rate of 12Hz (83ms/sample) a
+   * blink got one or two samples and its lowest point was very often missed
+   * entirely -- you blink, nothing happens, you blink again. The loop is
+   * self-paced: the next frame goes out as soon as the last result returns, so
+   * the phone runs at whatever it can actually sustain instead of a number
+   * guessed in advance. The floor below just stops a fast device from spinning
+   * hotter than the blink needs. */
+  const DETECT_INTERVAL_MS = PHONE_CAPTURE ? 22 : 16;
 
   /* ============================================================
      DOM REFS
@@ -638,7 +682,10 @@
     // Which engine won, on which delegate, over which camera request -- and why
     // the worker was abandoned if it was. Declared here so the #diag readout
     // never prints "undefined" for a field nothing has set yet.
-    engine: '', delegate: '', workerFailure: '', camConstraint: -1
+    engine: '', delegate: '', workerFailure: '', camConstraint: -1,
+    // Live blink numbers: the EAR being measured, the line it must cross for
+    // this player, and how many blinks have been accepted.
+    ear: 0, closeLine: 0, blinks: 0, hz: 0
   };
   // Read-only troubleshooting hook for Safari remote inspection.
   window.__blinkDebug = blinkDebug;
@@ -675,6 +722,14 @@
   let lastBlinkTime = 0;
   let lastFaceSeenTime = 0;
   let prevEar = 1;                // last EAR sample, for close-velocity detection
+  let lastEarTime = 0;            // when that sample landed, so velocity is per-second
+  let earBaseline = BASE_INIT;    // this player's own open-eye EAR, learned live
+  let baseSamples = 0;            // how many seed samples the baseline has had
+  /* Whether a blink can actually drop something right now. The eye is watched
+   * continuously; this only gates the game action, so a blink thrown while the
+   * previous cake is still falling is ignored rather than queued. */
+  let dropArmed = true;
+  let rateWindowStart = 0, rateCount = 0;   // for the achieved-Hz readout
 
   // Dot state cache - only touch the DOM when it actually changes
   let lastDotState = '';
@@ -736,7 +791,10 @@
       row('cam', (cameraOk ? 'ok' : 'no') + ' try=' + d.camConstraint + ' ' + d.cameraSize),
       row('mode', d.captureMode),
       row('sent', d.framesSent + '/' + d.captureAttempts, d.framesSent > 0),
+      row('rate', d.hz + 'Hz', d.hz >= 15),
       row('faces', d.faces + ' of ' + d.results, d.faces > 0),
+      row('ear', d.ear + ' < ' + d.closeLine + '?', d.ear > 0),
+      row('blinks', d.blinks, d.blinks > 0),
       row('errs', d.captureErrors + ' cap, ' + d.inferenceErrors + ' inf',
         d.captureErrors + d.inferenceErrors === 0),
       d.workerFailure ? 'fell back: ' + d.workerFailure : '',
@@ -1017,28 +1075,99 @@
   // so the block drops instantly at the blink's beginning - no waiting
   // for the eye to reopen. A short cooldown prevents double-triggers.
   function processEar(avgEar, now) {
-    // Velocity: how fast the eye is closing since the last sample (positive = closing).
-    const closingSpeed = prevEar - avgEar;
+    /* Velocity per second, and only against a sample that is actually adjacent.
+     * After a pause (block dropping, face briefly lost) the gap is long and the
+     * difference across it says nothing about how fast an eye is moving. */
+    const dt = lastEarTime > 0 ? now - lastEarTime : 0;
+    const adjacent = dt > 0 && dt <= EAR_GAP_MS;
+    const closingSpeed = adjacent ? (prevEar - avgEar) / (dt / 1000) : 0;
     prevEar = avgEar;
+    lastEarTime = now;
+
+    /* Seed the baseline from this player instead of decaying down to them.
+     *
+     * BASE_INIT is a desktop guess. Starting there and decaying meant a phone
+     * player's first blink or two happened while the line was still wrong --
+     * "it works after many tries" -- so for the first samples of a run, take
+     * the EAR at face value: whatever the eye reads when the run starts IS the
+     * open eye, because nobody starts a game mid-blink. */
+    if (baseSamples < BASE_SEED_SAMPLES) {
+      baseSamples += 1;
+      earBaseline = baseSamples === 1 ? avgEar
+        : Math.max(earBaseline, avgEar);
+      earBaseline = Math.min(BASE_MAX, Math.max(BASE_MIN, earBaseline));
+      blinkDebug.ear = +avgEar.toFixed(3);
+      blinkDebug.closeLine = +(earBaseline * CLOSE_RATIO).toFixed(3);
+      return;   // no blink test until there is a baseline to test against
+    }
+
+    /* This player's own open-eye level, as a rolling PEAK.
+     *
+     * Learned from a maximum rather than gated on eyeState. Gating on state was
+     * the flaw behind every variant of this bug: the baseline only learned while
+     * OPEN, so any latch in CLOSED froze it, and a frozen baseline keeps the
+     * close line wrong, which keeps the state latched. A peak tracker cannot
+     * deadlock -- it always follows the highest EAR seen recently, which IS the
+     * open eye, whatever the state machine believes.
+     *
+     * Rise is immediate (an eye opening wider is new truth); decay is slow, so
+     * a long blink cannot pull the baseline down after it, but moving the phone
+     * or changing posture is still tracked within a couple of seconds. */
+    if (avgEar > earBaseline) {
+      earBaseline = avgEar;
+    } else if (adjacent) {
+      earBaseline -= (earBaseline - avgEar) * BASE_DECAY * (dt / 1000);
+    }
+    earBaseline = Math.min(BASE_MAX, Math.max(BASE_MIN, earBaseline));
+
+    const closeLine = Math.min(CLOSE_MAX,
+      Math.max(CLOSE_MIN, earBaseline * CLOSE_RATIO));
+    blinkDebug.ear = +avgEar.toFixed(3);
+    blinkDebug.closeLine = +closeLine.toFixed(3);
+
     if (eyeState === 'OPEN') {
-      // Fire on EITHER a full close (EAR under threshold) OR a fast downward
-      // velocity while already dipping - the latter catches the very ONSET of
-      // a quick blink, so the drop triggers as your eyes START to close, not
-      // after they've shut. avgEar<0.30 gate stops wide-open jitter firing.
-      const fastClosing = closingSpeed > 0.045 && avgEar < 0.30;
-      if (avgEar < CLOSE_THRESHOLD || fastClosing) {
+      /* Fire on EITHER a dip past this player's close line OR a fast downward
+       * velocity while already dipping -- the latter catches the very ONSET of
+       * a quick blink, so the drop triggers as the eyes START to close. The
+       * velocity gate is relative to baseline too, so it cannot fire on a
+       * wide-open eye. */
+      const fastClosing = closingSpeed > CLOSE_VEL_PER_SEC &&
+        avgEar < earBaseline * 0.94;
+      if (avgEar < closeLine || fastClosing) {
         eyeState = 'CLOSED';
         closeStartTime = now;
         const nowMs = performance.now();
         if (nowMs - lastBlinkTime >= BLINK_COOLDOWN_MS) {
           lastBlinkTime = nowMs;
+          blinkDebug.blinks += 1;
           onBlink();
         }
       }
     } else { // CLOSED
-      if (avgEar > OPEN_THRESHOLD) {
+      /* Reopen against the BASELINE, not against a multiple of the close line.
+       * Deriving it from closeLine coupled two knobs together: pushing the
+       * close ratio up pushed the reopen line above a normal open eye, the
+       * machine latched CLOSED, and because the baseline only learns while OPEN
+       * it froze there -- one blink accepted, then nothing, forever. */
+      if (avgEar > earBaseline * REOPEN_RATIO) {
         eyeState = 'OPEN';
+      } else if (now - closeStartTime > STUCK_CLOSED_MS) {
+        /* Safety valve. If the state ever latches CLOSED -- a baseline learned
+         * too high, a player whose open eye genuinely reads low, a bad frame at
+         * the wrong moment -- every later blink is silently dropped and the game
+         * looks dead. No human holds a blink for a second, so treat this as a
+         * bad baseline rather than a closed eye: adopt what we are seeing as the
+         * new baseline.
+         *
+         * It must NOT hand back to OPEN, though. Doing that on a genuinely shut
+         * eye (someone resting their eyes) re-armed the OPEN branch against a
+         * freshly-lowered line and fired a blink every second in a loop. Stay
+         * CLOSED and let the normal reopen test release it once the eye is
+         * actually open again -- which it now can, against a sane baseline. */
+        earBaseline = Math.min(BASE_MAX, Math.max(BASE_MIN, avgEar / CLOSE_RATIO));
+        closeStartTime = now;   // re-arm the valve, do not spin on it
       }
+
     }
   }
 
@@ -1052,6 +1181,9 @@
    * starts is deliberately ignored here. */
   function onBlink() {
     if (!blinkReady) return;
+    // dropArmed replaces the old capture-level gate: the eye keeps being
+    // watched during DROP/LAND/TIP, but a blink then has nothing to drop.
+    if (!dropArmed) return;
     if (runStarted && game) {
       game.touchStartListener();
     }
@@ -1061,14 +1193,19 @@
   // and ships it to the Web Worker. ALL MediaPipe inference happens off-thread,
   // so the game's render loop is never blocked - smooth as the tap version.
   function detectTick() {
-    /* Once a block has been released, another blink cannot do useful work until
-     * the next block is swinging. Stop camera bitmap uploads/inference during
-     * DROP/LAND/TIP, exactly when gameplay animation needs the budget most. */
-    let useful = true;
+    /* Once a block has been released, another blink cannot drop anything until
+     * the next block is swinging -- but the eye must still be WATCHED through
+     * that window. Going dark during DROP/LAND/TIP meant the baseline went
+     * stale and the first sample of the new block arrived with no adjacent
+     * neighbour, so the blink you make as the next cake appears was the one
+     * most likely to be missed. Sample throughout; just skip the game action.
+     * Inference is off-thread, so this costs the render loop nothing. */
     if (runStarted && game) {
       const count = game.getVariable('BLOCK_COUNT');
       const block = game.getInstance('block_' + count);
-      useful = !block || block.status === 'SWING';
+      dropArmed = !block || block.status === 'SWING';
+    } else {
+      dropArmed = true;
     }
     /* iOS suspends the element when the phone sleeps or the tab goes to the
      * background, and it does not resume by itself -- without this the pipeline
@@ -1077,7 +1214,7 @@
       const resume = video.play();
       if (resume && resume.catch) resume.catch(() => {});
     }
-    if (useful && blinkReady && !frameInFlight && video.readyState >= 2 && !video.paused) {
+    if (blinkReady && !frameInFlight && video.readyState >= 2 && !video.paused) {
       /* Lock before conversion. On a slow phone, locking inside .then() allowed
        * several conversions to queue during the same inference and eventually
        * flooded the worker with stale frames. */
@@ -1145,6 +1282,15 @@
         blinkDebug.lastError = msg.frameError;
       }
       const now = performance.now();
+      // Real achieved sample rate, which is what decides whether a 120ms blink
+      // gets enough samples to be seen at all.
+      if (rateWindowStart === 0) rateWindowStart = now;
+      rateCount += 1;
+      if (now - rateWindowStart >= 1000) {
+        blinkDebug.hz = Math.round(rateCount * 1000 / (now - rateWindowStart));
+        rateWindowStart = now;
+        rateCount = 0;
+      }
       if (msg.face) {
         blinkDebug.faces += 1;
         lastFaceSeenTime = now;
@@ -1262,8 +1408,9 @@
     return `
       let FaceLandmarker = null, FilesetResolver = null;
 
-      const CLOSE_THRESHOLD = ${CLOSE_THRESHOLD};
-      const OPEN_THRESHOLD  = ${OPEN_THRESHOLD};
+      /* No thresholds in here. The worker reports raw EAR and the main thread
+       * owns the whole decision -- one state machine, shared by both engines,
+       * so a change to the blink feel cannot apply to one path and not the other. */
       const LEFT_EYE  = ${JSON.stringify(EYE_LEFT)};
       const RIGHT_EYE = ${JSON.stringify(EYE_RIGHT)};
 
