@@ -33,6 +33,8 @@ NAMES = [
     'leaderboard', 'result', 'main-bg',
     'mode-card', 'mode-blink', 'mode-tap',
     'medal-1', 'medal-2', 'medal-3',
+    # full-screen info panels (How to Play / Developer overlays)
+    'how-to-play', 'developer',
 ]
 
 before = after = 0
