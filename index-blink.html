@@ -174,7 +174,7 @@
      border-box above, so this eats into the button rather than widening it, and
      the content is centred, so the padding only bites once a label grows long
      enough to reach for the edge -- which is exactly when it should. */
-  .rs-btn { padding: 0 calc(var(--gw) * .026); -webkit-appearance: none; appearance: none; box-sizing: border-box; border: 0; font-family: inherit; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .rs-btn { padding: 0 calc(var(--gw) * .026); -webkit-appearance: none; appearance: none; box-sizing: border-box; border: 0; font-family: inherit; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .rs-btn svg { display: block; -webkit-box-flex: 0; flex: none; }
   .rs-btn:active { -webkit-transform: scale(.98); transform: scale(.98); }
   .rs-try { left: 13.96%; right: 15.04%; top: 71.68%; height: 7.42%; border-radius: 999px; font-size: calc(var(--gw) * .0618); color: #fff; background: linear-gradient(#82b415, #4d8a0c); border: calc(var(--gw) * .0085) solid #3a6a09; box-shadow: inset 0 calc(var(--gw) * .0096) 0 rgba(255, 255, 255, .32), 0 calc(var(--gw) * .0096) 0 rgba(48, 88, 8, .5); text-shadow: 0 calc(var(--gw) * .0043) 0 rgba(0, 0, 0, .25); }
@@ -385,7 +385,6 @@
      the form's bottom edge would move nothing. */
   .profile .go { display: block; width: 62%; margin: 0 auto; position: relative; top: calc(var(--gw) * .05); cursor: pointer; filter: drop-shadow(0 .03rem .05rem rgba(0,0,0,.35)); }
   .profile .go:active { transform: scale(.96); }
-  .profile .blink-tip { font-size: calc(var(--gw) * .032); color: #a9702a; margin-top: calc(var(--gw) * .02); }
   /* ---- control-mode chooser ---------------------------------------------
      Same stock as the profile card, so picking how you play and typing your
      name read as one step. The two illustrations ARE the buttons -
@@ -503,7 +502,6 @@
           </div>
           <div>
             <img id="profile-go" src="./assets/main-index-start.webp" class="go">
-            <div class="blink-tip">Blink drops the cake - tap the buttons</div>
           </div>
         </div>
       </div>
