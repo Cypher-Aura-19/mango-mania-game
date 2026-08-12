@@ -318,6 +318,30 @@
      heartbeat at 10px where a shadow radius change barely registers. */
   @keyframes dotPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.35); } }
 
+  /* Blink diagnostics, opened with #diag on the URL and nothing else.
+     A phone has no console worth the name: when the dot stays amber there, the
+     only way to learn WHICH of the three failures happened -- worker dead,
+     camera over-constrained, frames not flowing -- is to put the counters on the
+     glass. Hash-gated rather than gesture-gated so it cannot possibly eat a
+     gameplay tap, and read-only so it cannot change what it is measuring. */
+  #blinkDiag {
+    position: fixed;
+    right: 6px;
+    bottom: 22px;
+    max-width: 62vw;
+    padding: 6px 8px;
+    background: rgba(20, 14, 6, .82);
+    color: #ffe9c2;
+    font: 10px/1.45 ui-monospace, Menlo, Consolas, monospace;
+    border-radius: 6px;
+    white-space: pre;
+    z-index: 201;
+    pointer-events: auto;
+  }
+  #blinkDiag[hidden] { display: none; }
+  #blinkDiag b { color: #ffb300; font-weight: 600; }
+  #blinkDiag b.ok { color: #00e676; }
+
   /* ---- profile entry screen ---------------------------------------------
      Sized off --gw (the canvas width set in JS) rather than the viewport, so
      the text and avatar chips scale with the card itself on every screen. */
@@ -548,6 +572,9 @@
   <!-- Tiny connection state dot -->
   <div id="blinkDot" class="connecting"></div>
 
+  <!-- Counters behind the dot, shown only for /blink#diag. Tap to dismiss. -->
+  <div id="blinkDiag" hidden></div>
+
   <!-- Tower game bundle (exposes window.TowerGame) -->
   <script src="./dist/main.js?v=20260811-ios-60-menu"></script>
 
@@ -607,7 +634,11 @@
   const blinkDebug = {
     captureMode: PHONE_CAPTURE ? 'canvas' : 'video',
     cameraSize: '', captureAttempts: 0, framesSent: 0, results: 0,
-    faces: 0, captureErrors: 0, inferenceErrors: 0, lastError: ''
+    faces: 0, captureErrors: 0, inferenceErrors: 0, lastError: '',
+    // Which engine won, on which delegate, over which camera request -- and why
+    // the worker was abandoned if it was. Declared here so the #diag readout
+    // never prints "undefined" for a field nothing has set yet.
+    engine: '', delegate: '', workerFailure: '', camConstraint: -1
   };
   // Read-only troubleshooting hook for Safari remote inspection.
   window.__blinkDebug = blinkDebug;
@@ -684,6 +715,40 @@
     if (state === lastDotState) return; // avoid per-frame style churn
     lastDotState = state;
     blinkDot.className = state;
+  }
+
+  /* On-glass diagnostics for /blink#diag.
+   *
+   * Three separate faults can each leave the dot amber on a phone, and they are
+   * indistinguishable from the outside: the worker never loaded, the camera
+   * refused the constraints, or frames flow but no face is found. This prints
+   * the counter that separates them. Off unless the hash asks for it, so it
+   * costs a live player one string compare at load. */
+  const blinkDiag = document.getElementById('blinkDiag');
+  const diagWanted = () => /(^|[#&?])diag\b/.test(location.hash + location.search);
+  function paintDiag() {
+    const d = blinkDebug;
+    const row = (k, v, good) =>
+      k.padEnd(7) + (good ? '<b class="ok">' : '<b>') + String(v) + '</b>';
+    blinkDiag.innerHTML = [
+      row('engine', d.engine || 'worker (pending)', workerReady || localReady),
+      row('gpu', d.delegate || '-'),
+      row('cam', (cameraOk ? 'ok' : 'no') + ' try=' + d.camConstraint + ' ' + d.cameraSize),
+      row('mode', d.captureMode),
+      row('sent', d.framesSent + '/' + d.captureAttempts, d.framesSent > 0),
+      row('faces', d.faces + ' of ' + d.results, d.faces > 0),
+      row('errs', d.captureErrors + ' cap, ' + d.inferenceErrors + ' inf',
+        d.captureErrors + d.inferenceErrors === 0),
+      d.workerFailure ? 'fell back: ' + d.workerFailure : '',
+      d.lastError ? 'last: ' + d.lastError : ''
+    ].filter(Boolean).join('\n');
+  }
+  if (diagWanted()) {
+    blinkDiag.hidden = false;
+    paintDiag();
+    setInterval(paintDiag, 500);
+    // Tap dismisses it: once the answer has been read it is just in the way.
+    blinkDiag.addEventListener('click', () => { blinkDiag.hidden = true; });
   }
 
   // Browser autoplay policies block sound until a real user gesture (click,
@@ -1060,6 +1125,8 @@
       workerReady = true;
       modelProgress = 1;
       modelDone = true;
+      blinkDebug.engine = 'worker';
+      blinkDebug.delegate = msg.delegate || '';
       console.info('[Blink] Worker model ready (' + msg.delegate + ')');
       updateBlinkReadiness();
       renderProgress();
