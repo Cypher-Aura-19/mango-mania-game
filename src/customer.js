@@ -144,6 +144,35 @@ const clipUrl = (mood, appleMobile) => {
 const audioUrl = (mood) => `./assets/${MOODS[mood]}.mp3`
 const stillUrl = (mood) => `./assets/customer-${MOODS[mood]}-ios.webp?v=20260811-ios-static`
 
+/* The phone path plays a PRE-KEYED sprite atlas instead of keying video live.
+ * The expensive thing on a phone was never the decode — it was reading each
+ * video frame back through a canvas (getImageData) to subtract the white, which
+ * on WebKit is synchronous with the game loop. tools/make-customer-atlases.py
+ * does that keying offline, once, and packs the transparent frames into one
+ * WebP grid per mood. At runtime the customer is then one drawImage of a grid
+ * cell — the exact cost of the frozen still it replaces, now animated. The
+ * manifest carries the grid shape so this file needs no baked-in dimensions;
+ * if it fails to load we fall back to the still/video path unchanged. */
+const ATLAS_MANIFEST = './assets/customer-atlas.json'
+function loadAtlasManifest() {
+  if (typeof fetch !== 'function') return Promise.resolve(null)
+  return fetch(ATLAS_MANIFEST, { cache: 'force-cache' })
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null)
+}
+
+// Which cell of the atlas is showing at `time`. Reactions clamp on their last
+// frame and report ended; the watching bed loops.
+function atlasFrameIndex(a, time) {
+  const frameMs = 1000 / a.fps
+  const raw = Math.floor((time - a.startedAt) / frameMs)
+  if (a.loop) return ((raw % a.count) + a.count) % a.count
+  return raw < 0 ? 0 : (raw >= a.count ? a.count - 1 : raw)
+}
+function atlasEnded(a, time) {
+  return !a.loop && (time - a.startedAt) >= a.count * (1000 / a.fps)
+}
+
 // Exponential ease toward a target that stays stable across frame rates.
 const ease = (current, target, rate, dt) =>
   current + ((target - current) * (1 - Math.exp(-rate * dt)))
@@ -399,10 +428,51 @@ function frameId(video) {
  * on the frame already being drawn. What parking buys is that a reaction never
  * has to REWIND at the moment it is wanted, which is a seek landing exactly on
  * the frame the player is looking at. */
-function makeVideos(game, performanceMode, appleMobile) {
+function makeVideos(game, performanceMode, appleMobile, manifest) {
   const vids = {}
+  const mobile = appleMobile || performanceMode
   Object.keys(MOODS).forEach((mood) => {
     const resting = mood === 'watching'
+    /* Phones with a baked atlas: no video decoder, no keyer, no per-frame
+     * readback. Just the pre-keyed grid image and the mood's voice. The frame
+     * shown is chosen from a clock at draw time; nothing decodes. */
+    if (mobile && manifest && manifest.moods && manifest.moods[mood]) {
+      const meta = manifest.moods[mood]
+      const img = new Image()
+      img.decoding = 'async'
+      img.src = `./assets/${meta.file}`
+      const atlas = {
+        img,
+        cols: meta.cols,
+        rows: meta.rows,
+        count: meta.count,
+        cw: meta.cw,
+        ch: meta.ch,
+        fps: manifest.fps || 15,
+        loop: resting,
+        startedAt: 0,
+        frame: 0
+      }
+      let voice
+      if (game.appleAudio) {
+        const mixerName = `customer-${mood}`
+        const volume = resting ? VOICE_REST_LEVEL : VOICE_LEVEL
+        voice = {
+          mixerName,
+          loop: resting,
+          volume,
+          ready: game.appleAudio.register(mixerName, audioUrl(mood), volume)
+        }
+      } else {
+        voice = document.createElement('audio')
+        voice.src = audioUrl(mood)
+        voice.loop = resting
+        voice.preload = 'auto'
+        voice.volume = resting ? VOICE_REST_LEVEL : VOICE_LEVEL
+      }
+      vids[mood] = { el: null, voice, keyer: null, still: null, atlas }
+      return
+    }
     /* On iOS, never create a video decoder at all. WebKit makes canvas reads
      * from video synchronous with the main thread; even a tiny 6fps keyer can
      * block the hook/game loop. Pre-keyed stills keep every mood and its voice
@@ -496,7 +566,8 @@ function whenVideosReady(vids, onProgress) {
    * a few floors of the start. Six items, one bar. */
   const media = []
   Object.keys(vids).forEach((m) => {
-    media.push({ el: vids[m].still || vids[m].el, image: !!vids[m].still })
+    const pic = vids[m].atlas ? vids[m].atlas.img : (vids[m].still || vids[m].el)
+    media.push({ el: pic, image: !!(vids[m].atlas || vids[m].still) })
     if (vids[m].voice.ready) media.push({ promise: vids[m].voice.ready })
     else media.push({ el: vids[m].voice, image: false })
   })
@@ -554,13 +625,18 @@ function whenVideosReady(vids, onProgress) {
  * play() before the seek, because an element that is already playing ignores
  * play() entirely: a reaction cutting in over itself would otherwise carry on
  * from its own tail. */
-function startClipAndVoice(engine, mood, i) {
-  const { el, voice } = i.videos[mood]
+function startClipAndVoice(engine, mood, i, time) {
+  const { el, voice, atlas } = i.videos[mood]
   i.mediaStarted = true
   if (el) {
     const p = el.play()
     if (p && p.catch) p.catch(() => {})
   }
+  // Restart the atlas clock from this frame for a reaction, so it plays from
+  // its first cell. The watching loop is set ONCE and left running — a paused-
+  // and-resumed video picks its loop up mid-stride, and resetting the clock on
+  // every hand-back would instead snap the idle animation to frame 0.
+  if (atlas && (!atlas.loop || atlas.startedAt === 0)) atlas.startedAt = time
   if (!engine.soundOn) return
   if (voice.mixerName && engine.appleAudio) {
     engine.appleAudio.play(voice.mixerName, { loop: voice.loop, volume: voice.volume })
@@ -682,7 +758,7 @@ const customerAction = (instance, engine, time) => {
      * created and playing from engine construction so their first frame is
      * decoded, but the menu should be silent. This is the first gameplay frame,
      * which is also a user gesture's worth of history, so play() is allowed. */
-    startClipAndVoice(engine, 'watching', i)
+    startClipAndVoice(engine, 'watching', i, time)
     engine.setVariable(constant.customerMood, 'watching')
     engine.setVariable(constant.customerMoodAt, time)
     return
@@ -696,9 +772,12 @@ const customerAction = (instance, engine, time) => {
   // Correct the box to the clip's real aspect, once it is known.
   if (!i.fitted) {
     const watching = i.videos.watching
-    const source = watching.still || watching.el
-    const sourceWidth = watching.still ? source.naturalWidth : source.videoWidth
-    const sourceHeight = watching.still ? source.naturalHeight : source.videoHeight
+    const source = watching.atlas ? watching.atlas
+      : (watching.still || watching.el)
+    const sourceWidth = watching.atlas ? source.cw
+      : (watching.still ? source.naturalWidth : source.videoWidth)
+    const sourceHeight = watching.atlas ? source.ch
+      : (watching.still ? source.naturalHeight : source.videoHeight)
     if (sourceWidth && sourceHeight) {
       const colW = pw(engine)
       const scale = Math.min((colW * BOX_W) / sourceWidth,
@@ -720,7 +799,9 @@ const customerAction = (instance, engine, time) => {
    * started, and `ended` covers the case where it finished early or the timer
    * and the decoder disagree. */
   let want = i.shown
-  if (want !== 'watching' && (time >= i.until || (playing && playing.el && playing.el.ended))) {
+  const playingEnded = playing && ((playing.el && playing.el.ended)
+    || (playing.atlas && atlasEnded(playing.atlas, time)))
+  if (want !== 'watching' && (time >= i.until || playingEnded)) {
     want = 'watching'
   }
 
@@ -742,7 +823,22 @@ const customerAction = (instance, engine, time) => {
    * live keyers is the one version of this that drops frames. */
   if (want !== i.shown) {
     const from = i.videos[i.shown]
-    if (from && from.still) {
+    if (from && from.atlas) {
+      // Snapshot the outgoing cell so the cross-dissolve has something to fade,
+      // the same as the keyer path but reading one grid cell instead of k.out.
+      const a = from.atlas
+      if (!i.snap) i.snap = document.createElement('canvas')
+      if (i.snap.width !== a.cw || i.snap.height !== a.ch) {
+        i.snap.width = a.cw
+        i.snap.height = a.ch
+      }
+      const sctx = i.snap.getContext('2d')
+      sctx.clearRect(0, 0, a.cw, a.ch)
+      const sx = (a.frame % a.cols) * a.cw
+      const sy = Math.floor(a.frame / a.cols) * a.ch
+      sctx.drawImage(a.img, sx, sy, a.cw, a.ch, 0, 0, a.cw, a.ch)
+      i.fade = 0
+    } else if (from && from.still) {
       i.snap = from.still
       i.fade = 0
     } else if (from && from.keyer && from.keyer.ready) {
@@ -775,10 +871,10 @@ const customerAction = (instance, engine, time) => {
       /* Back to the resting state. Watching's picture never stopped — it loops
        * from engine construction — so this only restarts the voice, onto
        * whatever frame the loop has reached. */
-      startClipAndVoice(engine, 'watching', i)
+      startClipAndVoice(engine, 'watching', i, time)
     } else if (next) {
       // Picture and voice from zero on the same frame. This is the sync.
-      startClipAndVoice(engine, want, i)
+      startClipAndVoice(engine, want, i, time)
       /* Run for as long as the clip actually is. The fallback is only for a
        * browser that has not read the metadata yet; every real answer here
        * comes from the file. */
@@ -786,9 +882,13 @@ const customerAction = (instance, engine, time) => {
       const mixerDuration = next.voice.mixerName && engine.appleAudio
         ? engine.appleAudio.duration(next.voice.mixerName)
         : 0
-      const dur = mixerDuration || ((durationSource.duration && isFinite(durationSource.duration))
-        ? durationSource.duration
-        : REACTION_FALLBACK)
+      // The atlas is the picture on phones, so its own length is authoritative
+      // and keeps i.until in step with atlasEnded(); video/voice cover the rest.
+      const atlasDuration = next.atlas ? next.atlas.count / next.atlas.fps : 0
+      const dur = atlasDuration || mixerDuration
+        || ((durationSource.duration && isFinite(durationSource.duration))
+          ? durationSource.duration
+          : REACTION_FALLBACK)
       i.until = time + (dur * 1000)
     }
   }
@@ -802,9 +902,13 @@ const customerAction = (instance, engine, time) => {
   // A slow bob on top, so they read as hovering rather than pasted on.
   i.bob = Math.sin(i.elapsed * 1.6) * (i.h * 0.035)
 
-  // Key the drawn clip, but only when it has a new frame to key.
+  // Advance the pre-keyed atlas (phones) or key one video frame (desktop). The
+  // atlas costs nothing here — the shown cell is a function of the clock — so
+  // the whole per-frame customer cost on a phone is the one drawImage below.
   const cur = i.videos[i.shown]
-  if (cur && cur.el && cur.el.readyState >= 2 && cur.el.videoWidth) {
+  if (cur && cur.atlas) {
+    cur.atlas.frame = atlasFrameIndex(cur.atlas, time)
+  } else if (cur && cur.el && cur.el.readyState >= 2 && cur.el.videoWidth) {
     if (!cur.keyer.ready) sizeKeyer(cur.keyer, cur.el.videoWidth, cur.el.videoHeight)
     // Check the decoder frame only when the keyer's own budget allows work.
     // getVideoPlaybackQuality plus getImageData on every rAF was enough to stall
@@ -829,8 +933,11 @@ const customerPainter = (instance, engine) => {
   // gameplay frame lingers on the menu screen.
   if (!engine.getVariable(constant.gameStartNow, false)) return
   const cur = i.videos && i.videos[i.shown]
-  const source = cur && (cur.still || (cur.keyer && cur.keyer.ready ? cur.keyer.out : null))
-  if (!source) return
+  if (!cur) return
+  const atlasReady = cur.atlas && cur.atlas.img.complete && cur.atlas.img.naturalWidth > 0
+  const source = atlasReady ? null
+    : (cur.still || (cur.keyer && cur.keyer.ready ? cur.keyer.out : null))
+  if (!atlasReady && !source) return
   const { ctx } = engine
   const y = i.y + (i.bob || 0)
   // The outgoing frame underneath, fading; the incoming one over it, coming up.
@@ -844,7 +951,14 @@ const customerPainter = (instance, engine) => {
   }
   ctx.save()
   if (i.fade < 1) ctx.globalAlpha = i.fade
-  ctx.drawImage(source, i.x, y, i.w, i.h)
+  if (atlasReady) {
+    const a = cur.atlas
+    const sx = (a.frame % a.cols) * a.cw
+    const sy = Math.floor(a.frame / a.cols) * a.ch
+    ctx.drawImage(a.img, sx, sy, a.cw, a.ch, i.x, y, i.w, i.h)
+  } else {
+    ctx.drawImage(source, i.x, y, i.w, i.h)
+  }
   ctx.restore()
 }
 
@@ -857,17 +971,28 @@ export const addCustomer = (game, onProgress) => {
    * The returned promise is what the page waits on; see the loading gate in
    * index.html / index-blink.html. */
   const gameOption = game.getVariable(constant.gameUserOption) || {}
-  const videos = makeVideos(game, !!gameOption.performanceMode, !!gameOption.appleMobile)
-  const customer = new Instance({
-    name: 'customer',
-    action: customerAction,
-    painter: customerPainter
-  })
-  customer.videos = videos
-  game.addInstance(customer, constant.customerLayer)
-  return whenVideosReady(videos, onProgress).then(() => {
-    // Its first frame is decoded for instant start; do not spend battery
-    // decoding the watching loop underneath the menu screens.
-    if (videos.watching.el) videos.watching.el.pause()
+  const performanceMode = !!gameOption.performanceMode
+  const appleMobile = !!gameOption.appleMobile
+  const mobile = performanceMode || appleMobile
+  /* Phones fetch the pre-keyed atlas manifest before building; desktop needs
+   * none and skips straight through. A missing or failed manifest resolves to
+   * null, and makeVideos falls back to the still/video path unchanged — an
+   * absent atlas costs the player animation, never the game. The one-tick delay
+   * before the instance is added is invisible: nothing reads it until gameplay,
+   * long after the loading gate this promise feeds. */
+  return (mobile ? loadAtlasManifest() : Promise.resolve(null)).then((manifest) => {
+    const videos = makeVideos(game, performanceMode, appleMobile, manifest)
+    const customer = new Instance({
+      name: 'customer',
+      action: customerAction,
+      painter: customerPainter
+    })
+    customer.videos = videos
+    game.addInstance(customer, constant.customerLayer)
+    return whenVideosReady(videos, onProgress).then(() => {
+      // Its first frame is decoded for instant start; do not spend battery
+      // decoding the watching loop underneath the menu screens.
+      if (videos.watching.el) videos.watching.el.pause()
+    })
   })
 }

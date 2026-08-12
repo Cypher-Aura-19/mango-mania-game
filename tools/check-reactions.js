@@ -90,6 +90,27 @@ const ask = mood => `(() => {
   const errors = []
   page.on('pageerror', e => errors.push(String(e)))
 
+  /* This test asserts the VIDEO + keyer backend (v.el.currentTime, keyer.out):
+   * the reaction state machine is shared, but the picture backend it reads is
+   * the desktop one. Phones with a baked atlas take the pre-keyed path instead
+   * (no el, no keyer) — covered by .shots/atlas-check.js. A CI box with few
+   * cores trips performanceMode and would otherwise land on the atlas path here
+   * and read null.el, so pin the desktop profile before the bundle builds. */
+  await page.addInitScript(() => {
+    let real
+    Object.defineProperty(window, 'TowerGame', {
+      configurable: true,
+      get() {
+        return real ? function (opt) {
+          opt.performanceMode = false
+          opt.appleMobile = false
+          return real(opt)
+        } : undefined
+      },
+      set(v) { real = v }
+    })
+  })
+
   console.log(`      ${MODE} edition, ${URL}`)
   await page.goto(URL, { waitUntil: 'load' })
   await page.click('#start')

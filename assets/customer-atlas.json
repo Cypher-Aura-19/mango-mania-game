@@ -1,0 +1,30 @@
+{
+  "fps": 15,
+  "version": "20260812-atlas",
+  "moods": {
+    "watching": {
+      "file": "customer-watching-atlas.webp?v=20260812-atlas",
+      "cols": 13,
+      "rows": 12,
+      "count": 150,
+      "cw": 108,
+      "ch": 192
+    },
+    "happy": {
+      "file": "customer-happy-atlas.webp?v=20260812-atlas",
+      "cols": 13,
+      "rows": 12,
+      "count": 150,
+      "cw": 108,
+      "ch": 192
+    },
+    "angry": {
+      "file": "customer-angry-atlas.webp?v=20260812-atlas",
+      "cols": 13,
+      "rows": 12,
+      "count": 150,
+      "cw": 108,
+      "ch": 192
+    }
+  }
+}
