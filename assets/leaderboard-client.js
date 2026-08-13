@@ -14,6 +14,7 @@
   var DEVICE_KEY = 'mangoMania.deviceId';
   var QUEUE_KEY = 'mangoMania.pending';
   var SNAP_KEY = 'mangoMania.lastBoard';
+  var BEST_KEY = 'mangoMania.best';
   var TIMEOUT = 6000;
   var SLIDE_MS = 620;
   /* How long the previous standings sit still before the rows start moving.
@@ -147,7 +148,17 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }).then(function (res) {
-        if (res) drain(); else queue(body);
+        if (res) {
+          drain();
+          if (typeof res.best === 'number') {
+            try {
+              if (res.best === 0) localStorage.removeItem(BEST_KEY);
+              else localStorage.setItem(BEST_KEY, String(res.best));
+            } catch (e) { }
+          }
+        } else {
+          queue(body);
+        }
         return res;
       });
     },
@@ -174,7 +185,17 @@
         + '&meCompany=' + encodeURIComponent((p && p.company) || '')
         + '&meAvatar=' + encodeURIComponent((p && p.avatar) || 'avatar1'))
         .then(function (res) {
-          if (res && res.leaderboard) res.leaderboard = dedupe(res.leaderboard);
+          if (res && res.leaderboard) {
+            res.leaderboard = dedupe(res.leaderboard);
+            if (res.leaderboard.length === 0) {
+              try { localStorage.removeItem(SNAP_KEY); } catch (e) { }
+              var pending = [];
+              try { pending = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { }
+              if (!pending.length) {
+                try { localStorage.removeItem(BEST_KEY); } catch (e) { }
+              }
+            }
+          }
           return res;
         });
     },
@@ -200,6 +221,23 @@
       return ask('/api/me/' + encodeURIComponent(deviceId())
         + '?name=' + encodeURIComponent((p && p.name) || '')
         + '&company=' + encodeURIComponent((p && p.company) || ''));
+    },
+
+    syncBest: function () {
+      return MangoBoard.me().then(function (res) {
+        if (res && typeof res.best === 'number') {
+          var pending = [];
+          try { pending = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { }
+          if (!pending.length) {
+            try {
+              if (res.best === 0) localStorage.removeItem(BEST_KEY);
+              else localStorage.setItem(BEST_KEY, String(res.best));
+            } catch (e) { }
+          }
+          return res.best;
+        }
+        return null;
+      });
     },
 
     // The board as it stood the last time this device looked at it. Opening the
