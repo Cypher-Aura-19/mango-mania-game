@@ -213,45 +213,108 @@
         $("#over-modal").removeClass("hide");
 
         // Every run is posted, not just personal bests: the server keeps the play
-        // history and works out the board from it. Fire and forget - the card is
-        // already up, and a failed post parks the run in the client's retry queue.
+        // history and works out the board from it.
         if (window.MangoBoard) {
           window.MangoBoard.submit(
             readProfile(),
             score,
             successCount || 0,
             "tap"
-          );
+          ).then(function (res) {
+            if (res && typeof res.best === "number") {
+              var sBest = res.best;
+              try {
+                if (sBest === 0) localStorage.removeItem(BEST_KEY);
+                else localStorage.setItem(BEST_KEY, sBest);
+              } catch (e) {}
+              $("#result-best").text(sBest);
+              var sIsBest = score >= sBest && score > 0;
+              $("#result-newbest")[sIsBest ? "removeClass" : "addClass"]("hide");
+            }
+          });
         }
       }
 
       /* Take-the-lead celebration. The mark to beat is read once when the run
-       * starts, so passing it fires the party exactly once, mid-run - the player
-       * sees it while they are still stacking, not on the game-over card. */
+       * starts, so passing it fires the party mid-run - the player sees it while
+       * they are still stacking, not on the game-over card. */
       var chase = window.MangoParty ? new window.MangoParty.Chase() : null;
-      var chaseMine = false;
+      var partyTarget = null;
+      var partyMode = "best"; // "best" | "top" | "first" | "pb_then_top"
 
       function partyArm() {
         if (!chase || !window.MangoBoard) return;
         chase.arm(null);
-        window.MangoBoard.leader().then(function (top) {
-          if (!top) return;
-          // The top score is the mark to beat whether or not the row is already
-          // this player's. Passing your own record is still the best anyone has
-          // done, and the player who holds first place is the one most likely to
-          // beat it - skipping them meant the party almost never fired.
-          chaseMine = !!top.mine;
-          chase.arm(top.score);
-        });
+        partyTarget = null;
+        partyMode = "best";
+
+        function setArm(top) {
+          var myBest = readBest();
+          var topScore = top ? top.score : 0;
+          var topMine = top ? !!top.mine : false;
+
+          if (topScore > 0 && !topMine && myBest > 0 && myBest < topScore) {
+            partyTarget = myBest;
+            partyMode = "pb_then_top";
+            chase.arm(myBest);
+          } else if (topScore > 0 && !topMine) {
+            partyTarget = topScore;
+            partyMode = "top";
+            chase.arm(topScore);
+          } else if (myBest > 0) {
+            partyTarget = myBest;
+            partyMode = "best";
+            chase.arm(myBest);
+          } else if (topScore > 0) {
+            partyTarget = topScore;
+            partyMode = "top";
+            chase.arm(topScore);
+          } else {
+            partyTarget = 0;
+            partyMode = "first";
+            chase.arm(0);
+          }
+        }
+
+        if (window.MangoBoard.syncBest) {
+          window.MangoBoard.syncBest().then(function () {
+            window.MangoBoard.leader().then(setArm);
+          });
+        } else {
+          window.MangoBoard.leader().then(setArm);
+        }
       }
 
       function partyCheck(s) {
         if (!chase || !chase.check(s)) return;
+
+        var title = "New best!";
+        var note = "You just beat your high score!";
+
+        if (partyMode === "first") {
+          title = "New best!";
+          note = "You set the high score on the board!";
+        } else if (partyMode === "top") {
+          title = "You are #1!";
+          note = "Top of the leaderboard - hold on to it";
+        } else if (partyMode === "pb_then_top") {
+          title = "New personal best!";
+          note = "You beat your high score - keep going for #1!";
+          window.MangoBoard.leader().then(function (top) {
+            if (top && top.score > s) {
+              partyTarget = top.score;
+              partyMode = "top";
+              chase.arm(top.score);
+            }
+          });
+        } else {
+          title = "New best!";
+          note = "You just beat your own record - still top of the board";
+        }
+
         window.MangoParty.fire(document.getElementById("canvas"), {
-          title: chaseMine ? "New best!" : "You are #1!",
-          note: chaseMine
-            ? "You just beat your own record - still top of the board"
-            : "Top of the leaderboard - hold on to it",
+          title: title,
+          note: note,
           playAudio: function () {
             if (game && game.playAudio) game.playAudio("celebrate");
           },

@@ -205,7 +205,7 @@
     this.done = false;
   }
   Chase.prototype.arm = function (target) {
-    this.target = typeof target === 'number' && target > 0 ? target : null;
+    this.target = typeof target === 'number' && target >= 0 ? target : null;
     this.done = false;
   };
   Chase.prototype.check = function (score) {

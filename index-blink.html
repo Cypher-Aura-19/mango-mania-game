@@ -1638,30 +1638,86 @@
   /* Take-the-lead celebration. The mark to beat is read once when the run
    * starts, so passing it fires the party exactly once, mid-run - the player
    * sees it while they are still stacking, not on the game-over card. */
+  /* Take-the-lead celebration. The mark to beat is read once when the run
+   * starts, so passing it fires the party mid-run - the player sees it while
+   * they are still stacking, not on the game-over card. */
   const chase = window.MangoParty ? new window.MangoParty.Chase() : null;
-  let chaseMine = false;
+  let partyTarget = null;
+  let partyMode = 'best';
 
   function partyArm() {
     if (!chase || !window.MangoBoard) return;
     chase.arm(null);
-    window.MangoBoard.leader().then((top) => {
-      if (!top) return;
-      // The top score is the mark to beat whether or not the row is already
-      // this player's. Passing your own record is still the best anyone has
-      // done, and the player who holds first place is the one most likely to
-      // beat it - skipping them meant the party almost never fired.
-      chaseMine = !!top.mine;
-      chase.arm(top.score);
-    });
+    partyTarget = null;
+    partyMode = 'best';
+
+    const setArm = (top) => {
+      const myBest = readBest();
+      const topScore = top ? top.score : 0;
+      const topMine = top ? !!top.mine : false;
+
+      if (topScore > 0 && !topMine && myBest > 0 && myBest < topScore) {
+        partyTarget = myBest;
+        partyMode = 'pb_then_top';
+        chase.arm(myBest);
+      } else if (topScore > 0 && !topMine) {
+        partyTarget = topScore;
+        partyMode = 'top';
+        chase.arm(topScore);
+      } else if (myBest > 0) {
+        partyTarget = myBest;
+        partyMode = 'best';
+        chase.arm(myBest);
+      } else if (topScore > 0) {
+        partyTarget = topScore;
+        partyMode = 'top';
+        chase.arm(topScore);
+      } else {
+        partyTarget = 0;
+        partyMode = 'first';
+        chase.arm(0);
+      }
+    };
+
+    if (window.MangoBoard.syncBest) {
+      window.MangoBoard.syncBest().then(() => {
+        window.MangoBoard.leader().then(setArm);
+      });
+    } else {
+      window.MangoBoard.leader().then(setArm);
+    }
   }
 
   function partyCheck(s) {
     if (!chase || !chase.check(s)) return;
+
+    let title = 'New best!';
+    let note = 'You just beat your high score!';
+
+    if (partyMode === 'first') {
+      title = 'New best!';
+      note = 'You set the high score on the board!';
+    } else if (partyMode === 'top') {
+      title = 'You are #1!';
+      note = 'Top of the leaderboard - hold on to it';
+    } else if (partyMode === 'pb_then_top') {
+      title = 'New personal best!';
+      note = 'You beat your high score - keep going for #1!';
+      window.MangoBoard.leader().then((top) => {
+        if (top && top.score > s) {
+          partyTarget = top.score;
+          partyMode = 'top';
+          chase.arm(top.score);
+        }
+      });
+    } else {
+      title = 'New best!';
+      note = 'You just beat your own record - still top of the board';
+    }
+
     window.MangoParty.fire(document.getElementById('canvas'), {
-      title: chaseMine ? 'New best!' : 'You are #1!',
-      note: chaseMine
-        ? 'You just beat your own record - still top of the board'
-        : 'Top of the leaderboard - hold on to it',
+      title,
+      note,
       playAudio: () => game && game.playAudio && game.playAudio('celebrate'),
     });
   }
@@ -1718,10 +1774,21 @@
     document.getElementById('over-modal').classList.remove('hide');
 
     // Every run is posted, not just personal bests: the server keeps the play
-    // history and works out the board from it. Fire and forget - the card is
-    // already up, and a failed post parks the run in the client's retry queue.
+    // history and works out the board from it.
     if (window.MangoBoard) {
-      window.MangoBoard.submit(readProfile(), score, successCount || 0, 'blink');
+      window.MangoBoard.submit(readProfile(), score, successCount || 0, 'blink')
+        .then((res) => {
+          if (res && typeof res.best === 'number') {
+            const sBest = res.best;
+            try {
+              if (sBest === 0) localStorage.removeItem(BEST_KEY);
+              else localStorage.setItem(BEST_KEY, sBest);
+            } catch (e) { }
+            document.getElementById('result-best').textContent = sBest;
+            const sIsBest = score >= sBest && score > 0;
+            document.getElementById('result-newbest').classList.toggle('hide', !sIsBest);
+          }
+        });
     }
   }
 
